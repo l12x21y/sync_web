@@ -27,6 +27,7 @@ npm run dev          # http://localhost:5173
 - 全一样 → 撞上了，这一局结束；不一样 → 房主点「再写一次」
 - 一直填到所有人都一样为止，没有题数，也不计分
 - **默契里程**：一轮没对上，在场每人背 200 m，累计出「这局要一起跑完的距离」；页面和揭晓页都会显示，配点好玩的参照——操场几圈、几个马拉松、够不够从上海跑到北京
+- **弹幕发言**：从建房开始随时冒一句——底部输入一句话，所有人的屏幕上飘过一条气泡，飘过就散，不留历史、不占版面；一句话最多 30 个字，800ms 内的连发会被悄悄丢掉
 - 结束后可以看**对局记录**：浮层里逐轮列出，能复制成文字或存成一张矩阵图（人是一列，轮次是一行），里程板块和每轮背了多少米都在
 
 ![揭晓](docs/reveal.png)
@@ -53,8 +54,9 @@ shared/normalize.js    判同口径（前后端共用）
 shared/distance.js     默契里程的账本和参照物（前后端共用）
 src/useRoom.js         WebSocket 连接、状态同步、刷新续座、邀请链接优先
 src/components/Shell.jsx  顶栏 + 两栏外壳（窄屏自动单栏）
+src/components/Bubbles.jsx  弹幕气泡层（飘过即散）＋ ChatBar 底部细输入
 src/screens/           Home / Lobby / Play / Reveal
-test/smoke.mjs         16 个 ws 客户端跑完整一局，30+ 条断言（含房主设置/限时/题目/里程）
+test/smoke.mjs         16 个 ws 客户端跑完整一局，39 条断言（含设置/限时/题目/里程/弹幕）
 test/shots.mjs         CDP 驱动无头 Chrome，桌面 1440×900 + 手机 390×844 各走一遍
 render.yaml            Render Blueprint
 ```

@@ -19,7 +19,7 @@ function assert(cond, msg) {
 
 function makeClient(name) {
   const ws = new WebSocket(URL)
-  const c = { name, ws, room: null, id: null, errors: [], left: false, open: false }
+  const c = { name, ws, room: null, id: null, errors: [], chats: [], left: false, open: false }
   ws.on('open', () => {
     c.open = true
   })
@@ -33,6 +33,8 @@ function makeClient(name) {
     } else if (m.type === 'left') {
       c.left = true
       c.room = null
+    } else if (m.type === 'chat') {
+      c.chats.push(m)
     } else if (m.type === 'error') {
       c.errors.push(m.message)
     }
@@ -63,6 +65,14 @@ async function run() {
   await until(() => all.every((c) => c.open))
   assert(all.every((c) => c.open), '16 个连接建立')
 
+  // 弹幕：没进房间不能说
+  send(host, { type: 'chat', text: '还没进房就想说话' })
+  await wait(250)
+  assert(
+    host.errors.some((m) => /还没进房间/.test(m)),
+    '没进房间发消息被拦',
+  )
+
   send(host, { type: 'create', name: NAME })
   await until(() => host.room)
   assert(host.room?.phase === 'lobby', '建房成功，进入 lobby')
@@ -73,6 +83,31 @@ async function run() {
   peers.forEach((p) => send(p, { type: 'join', code, name: p.name }))
   await until(() => host.room.players.length === 16)
   assert(host.room.players.length === 16, '16 人全部进场')
+
+  // 弹幕：进房后广播给所有人，清洗空白，30 字封顶
+  send(host, { type: 'chat', text: '  大家好\n啊  ' })
+  await until(() => all.every((c) => c.chats.length === 1), 4000)
+  const hello = peers[0].chats[0]
+  assert(hello?.text === '大家好 啊', `空白被清洗：${JSON.stringify(hello?.text)}`)
+  assert(hello?.from === '阿真', '气泡带名字')
+  assert(hello?.playerId === host.id, '气泡带发言人 id（客户端好标「你」）')
+
+  // 30 字上限：超长截断（先等限流窗口过去）
+  await wait(850)
+  send(host, { type: 'chat', text: '一二三四五六七八九一二三四五六七八九一二三四五六七八九一二三四五六七八九' })
+  await until(() => peers[0].chats.length === 2, 4000)
+  assert(peers[0].chats[1].text.length === 30, `超长截到 30 字（实得 ${peers[0].chats[1].text.length}）`)
+
+  // 防刷屏：800ms 内第二句被悄悄丢掉
+  const before = peers[0].chats.length
+  send(host, { type: 'chat', text: '刷得太快' })
+  await wait(500)
+  assert(peers[0].chats.length === before, '800ms 内连发的第二句被丢弃')
+
+  // 别人也能说
+  send(peers[1], { type: 'chat', text: '我先想想' })
+  await until(() => host.chats.some((c) => c.from === '玩家02'), 4000)
+  assert(host.chats.some((c) => c.text === '我先想想'), '房间里人人都能冒泡')
 
   // 房主改设置：限时 + 题目
   send(host, { type: 'settings', roundSeconds: 8, theme: '一种热带水果' })

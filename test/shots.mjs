@@ -184,7 +184,9 @@ async function main() {
 
     await clickText('开始')
     await waitFor(`document.querySelector('.field--word')`)
-    await sleep(700)
+    // 群演冒一句泡，弹幕气泡入镜（8–10s 飘完，等它飘进画面）
+    guests[0].send({ type: 'chat', text: '我先想了个方向，都往水果想' })
+    await sleep(2100)
     await shot(`${prefix}-3-play`)
 
     // 第一轮：不一致

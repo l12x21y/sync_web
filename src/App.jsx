@@ -3,6 +3,8 @@ import Home from './screens/Home.jsx'
 import Lobby from './screens/Lobby.jsx'
 import Play from './screens/Play.jsx'
 import Reveal from './screens/Reveal.jsx'
+import Bubbles from './components/Bubbles.jsx'
+import ChatBar from './components/ChatBar.jsx'
 
 function Splash() {
   return (
@@ -26,7 +28,7 @@ function Splash() {
 }
 
 export default function App() {
-  const { room, myId, error, booting, isHost, create, join, start, submit, next, again, updateSettings, leave } =
+  const { room, myId, error, booting, isHost, chats, create, join, start, submit, next, again, updateSettings, sendChat, dropChat, leave } =
     useRoom()
 
   let screen
@@ -59,6 +61,12 @@ export default function App() {
         {screen}
       </div>
       {error ? <div className="toast">{error}</div> : null}
+      {room ? (
+        <>
+          <Bubbles chats={chats} myId={myId} onGone={dropChat} />
+          <ChatBar onSend={sendChat} />
+        </>
+      ) : null}
     </div>
   )
 }

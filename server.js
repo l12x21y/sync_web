@@ -38,6 +38,8 @@ const MAX_PLAYERS = 16
 const MAX_WORD_LEN = 8
 const MAX_NAME_LEN = 12
 const MAX_THEME_LEN = 16
+const MAX_CHAT_LEN = 30
+const CHAT_GAP_MS = 800
 const OFF_KEEP_MS = 90_000
 const ROOM_IDLE_MS = 30 * 60_000
 // 每轮写词限时：默认 30 秒，可用 env 调整出厂值；房主在大厅里能改
@@ -428,6 +430,31 @@ function handleMessage(ws, msg) {
         broadcast(room)
       }
       send(ws, { type: 'left' })
+      return
+    }
+
+    case 'chat': {
+      // 弹幕：房间里的任何人随时能冒一句，飘个气泡，不留历史
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      const now = Date.now()
+      if (player.lastChatAt && now - player.lastChatAt < CHAT_GAP_MS) return // 刷屏的悄悄丢掉
+      const text = String(msg.text ?? '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, MAX_CHAT_LEN)
+      if (!text) return
+      player.lastChatAt = now
+      touch(room)
+      const payload = JSON.stringify({
+        type: 'chat',
+        id: crypto.randomUUID(),
+        playerId: player.id,
+        from: player.name,
+        text,
+      })
+      for (const p of room.players) {
+        if (p.ws && p.ws.readyState === 1) p.ws.send(payload)
+      }
       return
     }
 

@@ -68,6 +68,8 @@ export function useRoom() {
   const [error, setError] = useState('')
   const [status, setStatus] = useState('idle')
   const [booting, setBooting] = useState(Boolean(bootSession))
+  // 弹幕：只留还在屏上飘的，飘完就被 Bubbles 回收
+  const [chats, setChats] = useState([])
 
   const wsRef = useRef(null)
   const openRef = useRef(null)
@@ -130,6 +132,7 @@ export function useRoom() {
           idRef.current = msg.playerId
           setMyId(msg.playerId)
           setRoom(msg.room)
+          setChats([])
           setBooting(false)
           writeSession(msg.room.code, msg.playerId)
         } else if (msg.type === 'left') {
@@ -137,6 +140,9 @@ export function useRoom() {
           idRef.current = null
           setMyId(null)
           setRoom(null)
+          setChats([])
+        } else if (msg.type === 'chat') {
+          setChats((cs) => [...cs.slice(-11), msg])
         } else if (msg.type === 'error') {
           setError(msg.message)
           if (/房间没了|座位没了/.test(msg.message)) {
@@ -202,6 +208,11 @@ export function useRoom() {
     (patch) => send({ type: 'settings', ...patch }),
     [send],
   )
+  const sendChat = useCallback((text) => send({ type: 'chat', text }), [send])
+  const dropChat = useCallback(
+    (id) => setChats((cs) => cs.filter((c) => c.id !== id)),
+    [],
+  )
 
   // 恢复会话时别一直卡在启动页
   useEffect(() => {
@@ -234,6 +245,7 @@ export function useRoom() {
     error,
     status,
     booting,
+    chats,
     isHost: Boolean(room && myId && room.hostId === myId),
     create,
     join,
@@ -242,6 +254,8 @@ export function useRoom() {
     next,
     again,
     updateSettings,
+    sendChat,
+    dropChat,
     leave,
   }
 }
