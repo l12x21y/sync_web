@@ -1,0 +1,27 @@
+{
+  "name": "tongci-xiangjian",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "同词相见 · 多人默契填词 web 版",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node server.js",
+    "build": "vite build",
+    "start": "node server.js --prod",
+    "smoke": "node test/smoke.mjs",
+    "shots": "node test/shots.mjs"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.3",
+    "vite": "^5.4.10"
+  }
+}

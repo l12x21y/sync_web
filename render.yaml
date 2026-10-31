@@ -1,0 +1,15 @@
+# Render Blueprint —— 一个 Web Service 同时跑静态页和 WebSocket。
+# 在 Render 控制台 New > Blueprint，选这个仓库就能直接起。
+services:
+  - type: web
+    name: sync-web
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
