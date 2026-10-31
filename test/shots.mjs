@@ -224,20 +224,23 @@ async function main() {
     if (prefix === 'd') {
       const dataUrl = await evalJs(`(async () => {
         const mod = await import('/src/share.js')
-        const mk = (round, groups, timedOut = false) => ({ round, allSame: groups.length === 1 && groups[0].count >= 2, timedOut, groups })
+        const mk = (round, groups, { timedOut = false, penalty = 0, distance = 0 } = {}) =>
+          ({ round, allSame: groups.length === 1 && groups[0].count >= 2, timedOut, penalty, distance, groups })
         const rounds = [
           mk(1, [
             { word: '吃饭', count: 2, names: ['阿真', '老周'] },
             { word: '睡觉', count: 2, names: ['小满', '大熊'] },
             { word: '散步', count: 1, names: ['阿吉'] },
-          ]),
+          ], { penalty: 1000, distance: 1000 }),
           mk(2, [
             { word: '电影', count: 2, names: ['阿真', '小满'] },
             { word: '逛街', count: 2, names: ['老周', '阿吉'] },
-          ], true),
-          mk(3, [{ word: '海边', count: 4, names: ['阿真', '小满', '老周', '阿吉'] }]),
+          ], { timedOut: true, penalty: 1000, distance: 2000 }),
+          mk(3, [
+            { word: '海边', count: 4, names: ['阿真', '小满', '老周', '阿吉'] },
+          ], { distance: 2000 }),
         ]
-        return mod.buildImage(rounds, { players: 5 }).toDataURL('image/png')
+        return mod.buildImage(rounds, { players: 5, distance: 2000 }).toDataURL('image/png')
       })()`)
       fs.writeFileSync(
         path.join(OUT, `${prefix}-9-share.png`),

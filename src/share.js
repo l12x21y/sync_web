@@ -3,6 +3,8 @@
  * 一段文字，或者一张矩阵图——人是一列，轮次是一行。
  */
 
+import { describeDistance } from '../shared/distance.js'
+
 /** 每轮展开成「谁写了什么」，同词的人排在一起 */
 function expandRound(round) {
   const rows = []
@@ -20,12 +22,20 @@ export function buildText(rounds, meta) {
 
   rounds.forEach((r, i) => {
     const tag = r.allSame ? '　对上了' : r.timedOut ? '　时间到' : ''
-    lines.push(`Round ${r.round || i + 1}${tag}`)
+    const plus = r.penalty ? `　+${r.penalty} m` : ''
+    lines.push(`Round ${r.round || i + 1}${tag}${plus}`)
     for (const row of expandRound(r)) {
       lines.push(`${row.name}　${row.word}`)
     }
     lines.push('')
   })
+
+  if (meta.distance > 0) {
+    const d = describeDistance(meta.distance)
+    lines.push(`Distance ${d.fmt}`)
+    lines.push(d.quips.join(' · '))
+    lines.push('')
+  }
 
   const last = rounds[rounds.length - 1]
   if (last?.allSame && last.groups?.[0]) {
@@ -105,10 +115,11 @@ export function buildImage(rounds, meta) {
   })
 
   const W = PAD * 2 + LABEL_W + colW.reduce((a, b) => a + b, 0)
+  const distInfo = meta.distance > 0 ? describeDistance(meta.distance) : null
   const HEAD = 208
   const HEAD_ROW = 56
   const ROW_H = 54
-  const FOOT = 118
+  const FOOT = distInfo ? 240 : 118
   const H = HEAD + HEAD_ROW + rounds.length * ROW_H + FOOT
 
   const cv = document.createElement('canvas')
@@ -198,11 +209,21 @@ export function buildImage(rounds, meta) {
       ctx.fillRect(tableX, y + 5, tableW, ROW_H - 10)
     }
 
-    // 行号
+    // 行号；这轮背了里程的话，把 +多少m 缩在行号下面
+    const hasPenalty = r.penalty > 0
     ctx.fillStyle = isFinal ? c.ink : c.ink3
     ctx.font = `400 13px ${MONO}`
     ctx.textAlign = 'left'
-    ctx.fillText(String(ri + 1).padStart(2, '0'), tableX, y + ROW_H / 2 + 5)
+    ctx.fillText(
+      String(ri + 1).padStart(2, '0'),
+      tableX,
+      y + (hasPenalty ? ROW_H / 2 - 2 : ROW_H / 2 + 5),
+    )
+    if (hasPenalty) {
+      ctx.fillStyle = c.accent
+      ctx.font = `400 10px ${MONO}`
+      ctx.fillText(`+${r.penalty.toLocaleString('en-US')}`, tableX, y + ROW_H / 2 + 15)
+    }
 
     // 每个人的词
     ctx.textAlign = 'center'
@@ -235,12 +256,36 @@ export function buildImage(rounds, meta) {
   ctx.fillRect(tableX, footY + 14, tableW, 1)
 
   ctx.textAlign = 'left'
+  let yDist = footY + 56
   if (last?.allSame && last.groups?.[0]) {
     ctx.fillStyle = c.ink
     ctx.font = `400 22px ${SERIF}`
     ctx.letterSpacing = '2px'
     ctx.fillText(`Final word 「${last.groups[0].word}」`, tableX, footY + 56)
     ctx.letterSpacing = '0px'
+    yDist = footY + 100
+  }
+
+  // 默契里程板块
+  if (distInfo) {
+    ctx.fillStyle = c.accent
+    ctx.font = `600 10.5px ${SANS}`
+    ctx.letterSpacing = '3px'
+    ctx.fillText('DISTANCE · 默契里程', tableX, yDist)
+    ctx.letterSpacing = '0px'
+
+    ctx.fillStyle = c.ink
+    ctx.font = `400 30px ${SERIF}`
+    ctx.letterSpacing = '2px'
+    ctx.fillText(distInfo.fmt, tableX, yDist + 38)
+    ctx.letterSpacing = '0px'
+
+    ctx.fillStyle = c.ink2
+    ctx.font = `400 12.5px ${SANS}`
+    const lines = wrapQuips(ctx, distInfo.quips.join(' · '), tableW)
+    lines.forEach((line, i) => {
+      ctx.fillText(line, tableX, yDist + 64 + i * 20)
+    })
   }
 
   ctx.fillStyle = c.ink3
@@ -250,6 +295,24 @@ export function buildImage(rounds, meta) {
   ctx.letterSpacing = '0px'
 
   return cv
+}
+
+/** quips 拼一行放不下就按参照物断行 */
+function wrapQuips(ctx, text, maxW) {
+  const parts = text.split(' · ')
+  const lines = []
+  let cur = ''
+  for (const p of parts) {
+    const t = cur ? `${cur} · ${p}` : p
+    if (cur && ctx.measureText(t).width > maxW) {
+      lines.push(cur)
+      cur = p
+    } else {
+      cur = t
+    }
+  }
+  if (cur) lines.push(cur)
+  return lines
 }
 
 export function downloadCanvas(canvas, filename) {

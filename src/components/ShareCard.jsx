@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { buildText, buildImage, downloadCanvas, copyText } from '../share.js'
+import { describeDistance } from '../../shared/distance.js'
 
-export default function ShareCard({ rounds, players, theme, onClose }) {
+export default function ShareCard({ rounds, players, theme, distance = 0, onClose }) {
   const [flash, setFlash] = useState('')
 
   const safeRounds = useMemo(() => rounds.filter((r) => (r.groups || []).length > 0), [rounds])
-  const meta = useMemo(() => ({ players, theme }), [players, theme])
+  const meta = useMemo(() => ({ players, theme, distance }), [players, theme, distance])
   const text = useMemo(() => buildText(safeRounds, meta), [safeRounds, meta])
+  const dist = distance > 0 ? describeDistance(distance) : null
 
   async function handleCopy() {
     const ok = await copyText(text)
@@ -66,6 +68,15 @@ export default function ShareCard({ rounds, players, theme, onClose }) {
               </section>
             )
           })}
+          {dist ? (
+            <section className="log log--dist">
+              <div className="log__head">
+                <span className="log__n">DISTANCE · 默契里程</span>
+              </div>
+              <p className="dist__big">{dist.fmt}</p>
+              <p className="dist__quips">{dist.quips.join(' · ')}</p>
+            </section>
+          ) : null}
         </div>
 
         <footer className="sheet__foot">

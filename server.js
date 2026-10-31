@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import { normalizeWord, displayWord } from './shared/normalize.js'
+import { PER_ROUND_M } from './shared/distance.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production'
@@ -72,6 +73,8 @@ function createRoom() {
     deadline: 0,
     timer: null,
     timedOut: false,
+    // 默契里程：一轮没对上，在场每人背 200 m，累计到这局结束
+    distance: 0,
     // 房主可改的设置
     roundSeconds: DEFAULT_ROUND_SECONDS,
     theme: '',
@@ -160,10 +163,22 @@ function maybeReveal(room, { force = false } = {}) {
   clearRoundTimer(room)
   room.phase = 'reveal'
   room.reveal = computeReveal(room)
+
+  // 默契里程：这轮没对上，在场每人背 200 m；对上了不涨
+  let penalty = 0
+  if (!room.reveal.allSame) {
+    const n = Math.max(activePlayers(room).length, room.reveal.answered, 2)
+    penalty = PER_ROUND_M * n
+    room.distance += penalty
+  }
+  room.reveal.penalty = penalty
+
   room.rounds.push({
     round: room.round,
     allSame: room.reveal.allSame,
     timedOut: room.reveal.timedOut,
+    penalty,
+    distance: room.distance,
     groups: room.reveal.groups.map((g) => ({
       word: g.word,
       count: g.count,
@@ -216,6 +231,7 @@ function publicRoom(room) {
     round: room.round,
     roundSeconds: room.roundSeconds,
     theme: room.theme,
+    distance: room.distance,
     reveal: room.phase === 'reveal' ? room.reveal : null,
     players: room.players.map((p) => ({
       id: p.id,
@@ -340,6 +356,7 @@ function handleMessage(ws, msg) {
       if (activePlayers(room).length < 2) return sendError(ws, '一个人玩不了')
       room.round = 0
       room.rounds = []
+      room.distance = 0
       beginRound(room)
       broadcast(room)
       return
@@ -378,6 +395,7 @@ function handleMessage(ws, msg) {
       room.answers.clear()
       room.reveal = null
       room.rounds = []
+      room.distance = 0
       room.deadline = 0
       broadcast(room)
       return

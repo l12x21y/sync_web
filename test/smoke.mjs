@@ -144,6 +144,11 @@ async function run() {
     '每一组都带着人名，人数对得上',
   )
 
+  // 默契里程：一轮没对上，16 人 × 200 m
+  assert(host.room.distance === 3200, `一轮没对上，累计 3,200 m（实得 ${host.room.distance}）`)
+  assert(host.room.reveal.penalty === 3200, '揭晓结果带上本轮 +3,200 m')
+  assert(host.room.rounds[0].distance === 3200, '轮次记录里存了累计里程')
+
   // 非房主推进
   send(peers[0], { type: 'next' })
   await wait(200)
@@ -160,11 +165,16 @@ async function run() {
   assert(host.room.reveal.allSame === true, '「夏天」「夏天。」「夏天！」归一化后判为同一个词')
   assert(host.room.reveal.round === 2, '第 2 轮撞上')
 
+  // 对上的一轮不涨里程；再开一局清零
+  assert(host.room.distance === 3200, `对上的这轮不涨里程（仍 ${host.room.distance} m）`)
+  assert(host.room.reveal.penalty === 0, '对上的一轮 penalty 为 0')
+
   // 超长词拦截（回到 lobby 再试）
   send(host, { type: 'again' })
   await until(() => host.room.phase === 'lobby')
   assert(host.room.phase === 'lobby', '再来一局回到 lobby')
   assert(host.room.rounds.length === 0, '局数记录已清空')
+  assert(host.room.distance === 0, '再开一局，里程清零')
 
   send(host, { type: 'start' })
   await until(() => host.room.phase === 'answering')

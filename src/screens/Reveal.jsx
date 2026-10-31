@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import Shell from '../components/Shell.jsx'
 import ShareCard from '../components/ShareCard.jsx'
+import DistanceNote from '../components/DistanceNote.jsx'
+import { describeDistance } from '../../shared/distance.js'
 
 export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
   const [showLog, setShowLog] = useState(false)
@@ -12,9 +14,12 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
       rounds={room.rounds || []}
       players={r.answered}
       theme={room.theme || ''}
+      distance={room.distance || 0}
       onClose={() => setShowLog(false)}
     />
   ) : null
+
+  const dist = room.distance > 0 ? describeDistance(room.distance) : null
 
   if (r.allSame) {
     const word = r.groups[0]?.word ?? ''
@@ -51,6 +56,11 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
           <p className="hit__sub">
             {r.answered} 个人，同一个词，用了 {r.round} 次。
           </p>
+          {dist ? (
+            <p className="hit__dist">
+              默契里程 {dist.fmt} · {dist.quips[0]}
+            </p>
+          ) : null}
         </div>
 
         <div className="footer" style={{ marginTop: 40, maxWidth: 380 }}>
@@ -110,6 +120,8 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
           </button>
         </div>
       </div>
+
+      <DistanceNote distance={room.distance || 0} delta={r.penalty || 0} rule />
 
       <div className="groups groups--grid">
         {r.groups.map((g, i) => (

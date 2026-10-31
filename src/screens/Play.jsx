@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Shell from '../components/Shell.jsx'
+import DistanceNote from '../components/DistanceNote.jsx'
 
 export default function Play({ room, myId, onSubmit, onLeave }) {
   const [draft, setDraft] = useState('')
@@ -87,6 +88,7 @@ export default function Play({ room, myId, onSubmit, onLeave }) {
           <p className="lede muted" style={{ fontSize: 12.5, marginTop: 26 }}>
             交出去就收不回，先别动。
           </p>
+          {room.distance > 0 ? <DistanceNote distance={room.distance} /> : null}
         </>
       ) : (
         <>
@@ -135,6 +137,8 @@ export default function Play({ room, myId, onSubmit, onLeave }) {
               交上去
             </button>
           </form>
+
+          {room.distance > 0 ? <DistanceNote distance={room.distance} /> : null}
         </>
       )}
     </Shell>
