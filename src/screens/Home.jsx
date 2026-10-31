@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import Shell from '../components/Shell.jsx'
 
-const NAME_KEY = 'tcxj.name'
+const NAME_KEY = 'gzh.name'
 
 function readInvite() {
   try {
@@ -50,7 +50,7 @@ export default function Home({ onCreate, onJoin }) {
     <Shell
       center
       sideCenter
-      meta="2–16 人 · 两三分钟一局"
+      meta="2–16 人 / 一局两三分钟"
       aside={
         <div className="card">
           <div className="tabs">
@@ -59,21 +59,21 @@ export default function Home({ onCreate, onJoin }) {
               onClick={() => setMode('create')}
               type="button"
             >
-              开新局
+              自己开一间
             </button>
             <button
               className={`tab${mode === 'join' ? ' tab--on' : ''}`}
               onClick={() => setMode('join')}
               type="button"
             >
-              进房间
+              进别人的
             </button>
           </div>
 
           <form className="form" onSubmit={handleSubmit}>
             <div>
               <label className="label" htmlFor="nick">
-                你的名字
+                怎么称呼你
               </label>
               <input
                 id="nick"
@@ -81,7 +81,7 @@ export default function Home({ onCreate, onJoin }) {
                 maxLength={12}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="随便叫什么都行"
+                placeholder="随便写，能认出来就行"
                 autoComplete="off"
                 autoCapitalize="off"
                 spellCheck={false}
@@ -91,7 +91,7 @@ export default function Home({ onCreate, onJoin }) {
             {mode === 'join' ? (
               <div>
                 <label className="label" htmlFor="room-code">
-                  房号
+                  房间号
                 </label>
                 <input
                   id="room-code"
@@ -107,38 +107,38 @@ export default function Home({ onCreate, onJoin }) {
             ) : null}
 
             <button className="btn" type="submit" disabled={!ready}>
-              {mode === 'create' ? '开一局' : '进房间'}
+              {mode === 'create' ? '开一间' : '进去'}
             </button>
           </form>
 
           <p className="lede muted form__foot" style={{ fontSize: 12 }}>
             {mode === 'create'
-              ? '开好之后把房号或链接发给他们。'
-              : '房号是 4 位数字，问发起人拿。'}
+              ? '开好之后，把房间号或者链接丢到群里喊人。'
+              : '四位数，问拉你进来的人要。'}
           </p>
         </div>
       }
     >
-      <p className="kicker">默 契 测 试</p>
-      <h1 className="hero__title">同词相见</h1>
+      <p className="kicker">RESONANCE</p>
+      <h1 className="hero__title">共振</h1>
       <p className="hero__sub">
-        几个人同时想一个词，写完才揭晓。
+        同一时间，几个人各自写下一个词。
         <br />
-        撞上了，才算默契。
+        全部一样，才说明你们想的是一件事。
       </p>
 
       <ul className="rules">
         <li>
           <span className="rules__n">01</span>
-          没有题面，也没有标准答案
+          没有题目，也没有参考答案
         </li>
         <li>
           <span className="rules__n">02</span>
-          每人一个词，谁先交都不影响
+          各写各的，交齐之前谁也看不见
         </li>
         <li>
           <span className="rules__n">03</span>
-          全员一致，这一局就结束
+          全对上了就散局，对不上就再写一次
         </li>
       </ul>
     </Shell>

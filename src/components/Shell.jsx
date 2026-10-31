@@ -7,14 +7,17 @@ export default function Shell({ meta, onLeave, aside, center, sideCenter, plain,
     <div className="screen">
       <header className="bar">
         <div className="brand">
-          <span className="brand__name">同词相见</span>
-          <span className="brand__en">TONGCI</span>
+          <span className="brand__mark" aria-hidden="true">
+            <i />
+            <i />
+          </span>
+          <span className="brand__name">共振</span>
         </div>
         <div className="bar__right">
           {meta ? <span className="bar__meta">{meta}</span> : null}
           {onLeave ? (
             <button className="bar__leave" onClick={onLeave} type="button">
-              离开
+              退出
             </button>
           ) : null}
         </div>

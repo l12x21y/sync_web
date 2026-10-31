@@ -12,12 +12,12 @@ function Splash() {
           className="pane pane--main pane--main--center"
           style={{ alignItems: 'center', textAlign: 'center' }}
         >
-          <span className="brand__en">正在回到座位</span>
+          <p className="kicker">正在回到原来的位子</p>
           <h1
             className="title"
-            style={{ fontSize: 30, letterSpacing: '0.2em', opacity: 0.5, marginTop: 14 }}
+            style={{ fontSize: 28, letterSpacing: '0.2em', opacity: 0.55, marginTop: 6 }}
           >
-            同词相见
+            共振
           </h1>
         </div>
       </div>

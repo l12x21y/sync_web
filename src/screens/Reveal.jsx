@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import Shell from '../components/Shell.jsx'
+import ShareCard from '../components/ShareCard.jsx'
 
 export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
+  const [showLog, setShowLog] = useState(false)
   const r = room.reveal
   if (!r) return null
+
+  const log = showLog ? (
+    <ShareCard
+      rounds={room.rounds || []}
+      players={r.answered}
+      onClose={() => setShowLog(false)}
+    />
+  ) : null
 
   if (r.allSame) {
     const word = r.groups[0]?.word ?? ''
@@ -10,12 +21,12 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
     return (
       <Shell
         center
-        meta={`第 ${r.round} 轮 · ${r.answered} 人`}
+        meta={`第 ${r.round} 次 / ${r.answered} 人`}
         onLeave={onLeave}
         aside={
           <>
             <div className="side-head">
-              <span className="eyebrow">同时想到的人</span>
+              <span className="eyebrow">都想的是这个</span>
               <span className="side-head__n">{r.answered}</span>
             </div>
             <div className="rows">
@@ -26,73 +37,95 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
                 </div>
               ))}
             </div>
-            <p className="lede muted" style={{ fontSize: 12.5, marginTop: 24 }}>
-              第 {r.round} 轮达成一致，这一局到此为止。
+            <p className="lede muted" style={{ fontSize: 12.5, marginTop: 22 }}>
+              第 {r.round} 次就对上了，这局到此为止。
             </p>
           </>
         }
       >
         <div className="hit">
-          <p className="hit__eyebrow">撞 上 了</p>
+          <p className="hit__eyebrow">对 上 了</p>
           <h1 className="hit__word">{word}</h1>
+          <span className="hit__rule" />
           <p className="hit__sub">
-            {r.answered} 个人，想到同一个词。用了 {r.round} 轮。
+            {r.answered} 个人，同一个词，用了 {r.round} 次。
           </p>
         </div>
 
-        <div className="footer" style={{ marginTop: 44, maxWidth: 340 }}>
-          {isHost ? (
-            <button className="btn" onClick={onAgain} type="button">
-              再来一局
+        <div className="footer" style={{ marginTop: 40, maxWidth: 380 }}>
+          <div className="btn-row">
+            {isHost ? (
+              <button className="btn" onClick={onAgain} type="button">
+                再开一局
+              </button>
+            ) : (
+              <p className="lede muted" style={{ fontSize: 13 }}>
+                等房主再开一局
+              </p>
+            )}
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => setShowLog(true)}
+              type="button"
+              style={{ flex: 'none', width: 132 }}
+            >
+              这一局记录
             </button>
-          ) : (
-            <p className="lede">等房主开下一局</p>
-          )}
+          </div>
         </div>
+        {log}
       </Shell>
     )
   }
+
   return (
-    <Shell meta={`第 ${r.round} 轮 · ${r.distinct} 个不同的词`} onLeave={onLeave} plain>
+    <Shell meta={`第 ${r.round} 次 / ${r.distinct} 个不同的词`} onLeave={onLeave} plain>
       <div className="verdict-row">
         <div>
-          <h1 className="verdict">没撞上</h1>
+          <h1 className="verdict">差一点</h1>
           <p className="verdict__note">
-            {r.distinct} 个不同的词。看一眼别人写了什么，再来一轮，直到所有人都一样。
+            {r.distinct} 个词，没有撞上的。看一眼别人写的，再写一次。
           </p>
           {r.missing && r.missing.length ? (
             <p className="lede muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-              {r.missing.join('、')} 这轮没交，没算进去。
+              {r.missing.join('、')} 这次没交
+              {r.timedOut ? '，时间到了就按已交的算' : '，没算在里头'}。
             </p>
           ) : null}
         </div>
 
-        <div className="verdict-act">
+        <div className="verdict-act stack">
           {isHost ? (
             <button className="btn" onClick={onNext} type="button">
-              再来一轮
+              再写一次
             </button>
           ) : (
-            <p className="lede">等房主开下一轮</p>
+            <p className="lede muted" style={{ fontSize: 13 }}>
+              等房主开下一次
+            </p>
           )}
+          <button className="linkish" onClick={() => setShowLog(true)} type="button">
+            看这 {r.round} 次的记录
+          </button>
         </div>
       </div>
 
       <div className="groups groups--grid">
         {r.groups.map((g, i) => (
           <div
-            className={`group${i === 0 ? ' group--lead' : ''}`}
+            className={`group${i === 0 && g.count > 1 ? ' group--lead' : ''}`}
             key={`${g.word}-${i}`}
             style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
           >
+            {g.count > 1 ? <span className="group__n">{g.count} 人</span> : null}
             <span className="group__word">{g.word}</span>
-            <span className="group__n">{g.count}</span>
             <span className="group__who">{g.names.join('、')}</span>
           </div>
         ))}
       </div>
 
       <div className="spacer" />
+      {log}
     </Shell>
   )
 }

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "同词相见 · 多人默契填词 web 版",
+  "description": "共振 · 多人默契填词 web 版",
   "engines": {
     "node": ">=20"
   },

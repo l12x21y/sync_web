@@ -38,6 +38,8 @@ const MAX_WORD_LEN = 8
 const MAX_NAME_LEN = 12
 const OFF_KEEP_MS = 90_000
 const ROOM_IDLE_MS = 30 * 60_000
+// 每轮的兜底时间：到点就不再等没交的人，按已交的判一次
+const ROUND_MS = Number(process.env.ROUND_SECONDS || 60) * 1000
 
 /** @type {Map<string, any>} */
 const rooms = new Map()
@@ -60,6 +62,9 @@ function createRoom() {
     answers: new Map(),
     reveal: null,
     rounds: [],
+    deadline: 0,
+    timer: null,
+    timedOut: false,
     touchedAt: Date.now(),
   }
   rooms.set(room.code, room)
@@ -92,10 +97,11 @@ function activePlayers(room) {
 
 // ---------------------------------------------------------------- 判定
 function computeReveal(room) {
-  const active = activePlayers(room)
   const groups = new Map()
 
-  for (const p of active) {
+  // 按「所有交过答案的人」统计，不只算在线的。
+  // 交完就掉线的人，答案照样有效——否则会少算一个人。
+  for (const p of room.players) {
     const raw = room.answers.get(p.id)
     if (raw == null) continue
     const key = normalizeWord(raw)
@@ -109,33 +115,52 @@ function computeReveal(room) {
     (a, b) => b.count - a.count || a.word.localeCompare(b.word, 'zh'),
   )
 
+  const answeredIds = new Set([...room.answers.keys()])
+  const missing = activePlayers(room)
+    .filter((p) => !answeredIds.has(p.id))
+    .map((p) => p.name)
+
   return {
     allSame: list.length === 1 && list[0].count >= 2,
     groups: list,
     round: room.round,
     answered: list.reduce((n, g) => n + g.count, 0),
     distinct: list.length,
-    missing: active.filter((p) => !room.answers.has(p.id)).map((p) => p.name),
+    missing,
+    timedOut: Boolean(room.timedOut),
   }
 }
 
-function maybeReveal(room) {
+function clearRoundTimer(room) {
+  if (room.timer) {
+    clearTimeout(room.timer)
+    room.timer = null
+  }
+}
+
+function maybeReveal(room, { force = false } = {}) {
   if (room.phase !== 'answering') return false
   const active = activePlayers(room)
   if (active.length < 2) return false
-  if (!active.every((p) => room.answers.has(p.id))) return false
+  const answered = active.filter((p) => room.answers.has(p.id)).length
+  if (!force && answered < active.length) return false
+  // 强制结算也要至少两个人交过，否则没法判「一致」
+  if (force && room.answers.size < 2) return false
 
+  clearRoundTimer(room)
   room.phase = 'reveal'
   room.reveal = computeReveal(room)
   room.rounds.push({
     round: room.round,
     allSame: room.reveal.allSame,
+    timedOut: room.reveal.timedOut,
     groups: room.reveal.groups.map((g) => ({
       word: g.word,
       count: g.count,
       names: g.names.slice(),
     })),
   })
+  room.timedOut = false
   return true
 }
 
@@ -143,7 +168,29 @@ function beginRound(room) {
   room.round += 1
   room.answers.clear()
   room.reveal = null
+  room.timedOut = false
   room.phase = 'answering'
+  room.deadline = Date.now() + ROUND_MS
+  clearRoundTimer(room)
+  room.timer = setTimeout(() => {
+    room.timer = null
+    if (room.phase !== 'answering') return
+    room.timedOut = true
+    // 到点先按已交的结算；人太少就再宽限一次
+    if (!maybeReveal(room, { force: true })) {
+      room.timedOut = false
+      room.deadline = Date.now() + 30_000
+      room.timer = setTimeout(() => {
+        room.timer = null
+        if (room.phase !== 'answering') return
+        room.timedOut = true
+        maybeReveal(room, { force: true })
+        broadcast(room)
+      }, 30_000)
+    } else {
+      broadcast(room)
+    }
+  }, ROUND_MS)
 }
 
 // ---------------------------------------------------------------- 下发
@@ -164,6 +211,8 @@ function publicRoom(room) {
     })),
     answeredCount: active.filter((p) => room.answers.has(p.id)).length,
     activeCount: active.length,
+    // 下发「还剩多久」而不是绝对时间，免得客户端时钟不准
+    deadlineIn: room.phase === 'answering' ? Math.max(0, room.deadline - Date.now()) : 0,
     rounds: room.rounds,
   }
 }
@@ -205,9 +254,9 @@ function handleMessage(ws, msg) {
 
   switch (msg.type) {
     case 'create': {
-      if (ws.roomCode) return sendError(ws, '你已经在房间里了')
+      if (ws.roomCode) return sendError(ws, '你人已经在房间里了')
       const name = cleanName(msg.name)
-      if (!name) return sendError(ws, '先起个名字')
+      if (!name) return sendError(ws, '名字还没填')
       const r = createRoom()
       const p = addPlayer(r, name, ws)
       r.hostId = p.id
@@ -219,15 +268,15 @@ function handleMessage(ws, msg) {
     }
 
     case 'join': {
-      if (ws.roomCode) return sendError(ws, '你已经在房间里了')
+      if (ws.roomCode) return sendError(ws, '你人已经在房间里了')
       const code = String(msg.code ?? '').trim()
       const name = cleanName(msg.name)
-      if (!name) return sendError(ws, '先起个名字')
+      if (!name) return sendError(ws, '名字还没填')
       const r = rooms.get(code)
-      if (!r) return sendError(ws, '房号不对，或者房间已经散了')
-      if (r.phase !== 'lobby') return sendError(ws, '这局已经开始了，等结束再来')
+      if (!r) return sendError(ws, '房间号不对，或者这间已经散了')
+      if (r.phase !== 'lobby') return sendError(ws, '已经开局了，等这间散了再来')
       if (activePlayers(r).length >= MAX_PLAYERS)
-        return sendError(ws, `最多 ${MAX_PLAYERS} 个人`)
+        return sendError(ws, `这间最多 ${MAX_PLAYERS} 个人`)
       const p = addPlayer(r, name, ws)
       ws.roomCode = r.code
       ws.playerId = p.id
@@ -239,9 +288,9 @@ function handleMessage(ws, msg) {
     case 'rejoin': {
       const code = String(msg.code ?? '').trim()
       const r = rooms.get(code)
-      if (!r) return sendError(ws, '房间没了，重新开一局吧')
+      if (!r) return sendError(ws, '这间房散了，重新开一间')
       const p = r.players.find((x) => x.id === msg.playerId)
-      if (!p) return sendError(ws, '座位没了，重新进吧')
+      if (!p) return sendError(ws, '你的位子没了，重新进一次')
       if (p.offTimer) {
         clearTimeout(p.offTimer)
         p.offTimer = null
@@ -256,10 +305,10 @@ function handleMessage(ws, msg) {
     }
 
     case 'start': {
-      if (!room || !player) return sendError(ws, '先开个房间')
-      if (room.hostId !== player.id) return sendError(ws, '只有房主能开始')
-      if (room.phase !== 'lobby') return sendError(ws, '这局已经开始了')
-      if (activePlayers(room).length < 2) return sendError(ws, '至少两个人才能玩')
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      if (room.hostId !== player.id) return sendError(ws, '只有房主能开')
+      if (room.phase !== 'lobby') return sendError(ws, '已经开始了')
+      if (activePlayers(room).length < 2) return sendError(ws, '一个人玩不了')
       room.round = 0
       room.rounds = []
       beginRound(room)
@@ -268,13 +317,13 @@ function handleMessage(ws, msg) {
     }
 
     case 'submit': {
-      if (!room || !player) return sendError(ws, '先开个房间')
-      if (room.phase !== 'answering') return sendError(ws, '现在不是作答时间')
-      if (room.answers.has(player.id)) return sendError(ws, '这一轮你已经交了')
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      if (room.phase !== 'answering') return sendError(ws, '这会儿不用写')
+      if (room.answers.has(player.id)) return sendError(ws, '这次你已经交过了')
       const word = displayWord(String(msg.word ?? ''))
       if (!word) return sendError(ws, '写一个词')
       if ([...word].length > MAX_WORD_LEN) return sendError(ws, `最多 ${MAX_WORD_LEN} 个字`)
-      if (!normalizeWord(word)) return sendError(ws, '写个正经的词')
+      if (!normalizeWord(word)) return sendError(ws, '这个不算一个词')
       room.answers.set(player.id, word)
       maybeReveal(room)
       broadcast(room)
@@ -282,23 +331,25 @@ function handleMessage(ws, msg) {
     }
 
     case 'next': {
-      if (!room || !player) return sendError(ws, '先开个房间')
-      if (room.hostId !== player.id) return sendError(ws, '只有房主能推进')
-      if (room.phase !== 'reveal') return sendError(ws, '结果还没出来')
-      if (room.reveal?.allSame) return sendError(ws, '已经撞上了，开新的一局吧')
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      if (room.hostId !== player.id) return sendError(ws, '只有房主能往下走')
+      if (room.phase !== 'reveal') return sendError(ws, '结果还没出')
+      if (room.reveal?.allSame) return sendError(ws, '已经对上了，直接开新的')
       beginRound(room)
       broadcast(room)
       return
     }
 
     case 'again': {
-      if (!room || !player) return sendError(ws, '先开个房间')
-      if (room.hostId !== player.id) return sendError(ws, '只有房主能再来一局')
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      if (room.hostId !== player.id) return sendError(ws, '只有房主能再开一局')
+      clearRoundTimer(room)
       room.phase = 'lobby'
       room.round = 0
       room.answers.clear()
       room.reveal = null
       room.rounds = []
+      room.deadline = 0
       broadcast(room)
       return
     }
@@ -323,6 +374,7 @@ function handleMessage(ws, msg) {
       ws.playerId = null
 
       if (room.players.length === 0) {
+        clearRoundTimer(room)
         rooms.delete(room.code)
       } else {
         if (room.phase === 'answering') maybeReveal(room)
@@ -337,7 +389,7 @@ function handleMessage(ws, msg) {
       return
 
     default:
-      sendError(ws, '不认识这个操作')
+      sendError(ws, '不懂这个操作')
   }
 }
 
@@ -367,6 +419,9 @@ wss.on('connection', (ws) => {
     if (!room) return
     const player = room.players.find((p) => p.id === ws.playerId)
     if (!player) return
+    // 这个人已经用新连接回来了，旧连接的关闭不能把他的 ws 抹掉，
+    // 否则他从此收不到任何广播（表现为「别人交了我不更新」）。
+    if (player.ws !== ws) return
 
     player.connected = false
     player.ws = null

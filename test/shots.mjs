@@ -164,7 +164,7 @@ async function main() {
 
     await typeInto('#nick', '阿真')
     await sleep(150)
-    await clickText('开一局')
+    await clickText('开一间')
     await waitFor(`document.querySelector('.code')`)
     const code = await evalJs(`document.querySelector('.code').textContent.trim()`)
     console.log('  房号', code)
@@ -187,7 +187,7 @@ async function main() {
     // 第一轮：不一致
     await typeInto('.field--word', '吃饭')
     await sleep(200)
-    await clickText('交')
+    await clickText('交上去')
     await sleep(300)
     guests.forEach((g, i) => g.send({ type: 'submit', word: i === 0 ? '睡觉' : `词${i}` }))
     await waitFor(`document.querySelector('.groups')`)
@@ -195,19 +195,53 @@ async function main() {
     await shot(`${prefix}-4-reveal`)
 
     // 第二轮：撞上
-    await clickText('再来一轮')
+    await clickText('再写一次')
     await waitFor(`document.querySelector('.field--word')`)
     await sleep(500)
     await shot(`${prefix}-5-round2`)
 
     await typeInto('.field--word', '吃饭')
     await sleep(200)
-    await clickText('交')
+    await clickText('交上去')
     await sleep(300)
     guests.forEach((g) => g.send({ type: 'submit', word: '吃饭' }))
     await waitFor(`document.querySelector('.hit__word')`)
     await sleep(1000)
     await shot(`${prefix}-6-hit`)
+
+    // 这一局的完整记录
+    await clickText('这一局记录')
+    await waitFor(`document.querySelector('.sheet__panel')`)
+    await sleep(700)
+    await shot(`${prefix}-8-log`)
+    await clickText('✕')
+    await sleep(300)
+
+    // 分享矩阵图：人是一列，轮次是一行（桌面那趟才导，造一份带「没交」的数据）
+    if (prefix === 'd') {
+      const dataUrl = await evalJs(`(async () => {
+        const mod = await import('/src/share.js')
+        const mk = (round, groups, timedOut = false) => ({ round, allSame: groups.length === 1 && groups[0].count >= 2, timedOut, groups })
+        const rounds = [
+          mk(1, [
+            { word: '吃饭', count: 2, names: ['阿真', '老周'] },
+            { word: '睡觉', count: 2, names: ['小满', '大熊'] },
+            { word: '散步', count: 1, names: ['阿吉'] },
+          ]),
+          mk(2, [
+            { word: '电影', count: 2, names: ['阿真', '小满'] },
+            { word: '逛街', count: 2, names: ['老周', '阿吉'] },
+          ], true),
+          mk(3, [{ word: '海边', count: 4, names: ['阿真', '小满', '老周', '阿吉'] }]),
+        ]
+        return mod.buildImage(rounds, { players: 5 }).toDataURL('image/png')
+      })()`)
+      fs.writeFileSync(
+        path.join(OUT, `${prefix}-9-share.png`),
+        Buffer.from(dataUrl.split(',')[1], 'base64'),
+      )
+      console.log('  📸', `${prefix}-9-share`)
+    }
 
     guests.forEach((g) => g.ws.close())
     await sleep(200)
@@ -231,7 +265,7 @@ async function main() {
     guestNames: ['小满', '老周'],
   })
 
-  // 邀请链接：带 ?r= 打开应当直接落到「进房间」并填好房号
+  // 邀请链接：带 ?r= 打开应当直接落到「进别人的」并填好房号
   await cdp.send('Emulation.setDeviceMetricsOverride', {
     width: 1440,
     height: 900,
@@ -244,7 +278,7 @@ async function main() {
   const filled = await evalJs(`document.querySelector('#room-code').value`)
   const tab = await evalJs(`document.querySelector('.tab--on').textContent.trim()`)
   console.log('  邀请链接回填：', filled, '/ 当前页签：', tab)
-  if (filled !== '4321' || tab !== '进房间') throw new Error('邀请链接没有正确落到进房间')
+  if (filled !== '4321' || tab !== '进别人的') throw new Error('邀请链接没有正确落到进别人的')
   await shot('d-7-invite')
 
   cdp.ws.close()

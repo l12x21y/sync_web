@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const STORE_KEY = 'tcxj.session'
+const STORE_KEY = 'gzh.session'
 
 function readSession() {
   try {

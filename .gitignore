@@ -4,3 +4,5 @@ dist/
 shots/
 *.log
 .DS_Store
+color.png
+ref.png
