@@ -68,10 +68,29 @@ async function run() {
   assert(host.room?.phase === 'lobby', '建房成功，进入 lobby')
   const code = host.room.code
   assert(/^\d{4}$/.test(code), `房号是 4 位数字：${code}`)
+  assert(host.room.roundSeconds === 30, '默认每轮限时 30 秒')
 
   peers.forEach((p) => send(p, { type: 'join', code, name: p.name }))
   await until(() => host.room.players.length === 16)
   assert(host.room.players.length === 16, '16 人全部进场')
+
+  // 房主改设置：限时 + 题目
+  send(host, { type: 'settings', roundSeconds: 8, theme: '一种热带水果' })
+  await wait(250)
+  assert(host.room.roundSeconds === 8, '限时改成 8 秒')
+  assert(host.room.theme === '一种热带水果', '题目已设置')
+
+  // 越界值被夹回合法区间
+  send(host, { type: 'settings', roundSeconds: 9999 })
+  await wait(200)
+  assert(host.room.roundSeconds === 300, '限时上限 300 秒')
+  send(host, { type: 'settings', roundSeconds: 8 })
+  await wait(200)
+
+  // 非房主改设置应被拦
+  send(peers[0], { type: 'settings', roundSeconds: 120 })
+  await wait(200)
+  assert(host.room.roundSeconds === 8, '非房主改不动设置')
 
   // 第 17 个人应该被挡在门外
   const extra = makeClient('多余的人')
@@ -93,6 +112,16 @@ async function run() {
   await until(() => all.every((c) => c.room?.phase === 'answering'), 8000)
   assert(host.room.phase === 'answering' && host.room.round === 1, '开局进入第 1 轮')
   assert(host.room.activeCount === 16, '16 人都在作答')
+  assert(
+    host.room.deadlineIn > 0 && host.room.deadlineIn <= 8000,
+    `房主设的限时生效（剩 ${host.room.deadlineIn}ms）`,
+  )
+  assert(host.room.theme === '一种热带水果', '作答状态带着题目')
+
+  // 开局以后不能再改设置
+  send(host, { type: 'settings', roundSeconds: 60 })
+  await wait(200)
+  assert(host.room.roundSeconds === 8, '开局以后改不动设置')
 
   // 一人先交：进度可见，内容不可见
   send(host, { type: 'submit', word: '  苹果！ ' })

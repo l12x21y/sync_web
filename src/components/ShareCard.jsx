@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { buildText, buildImage, downloadCanvas, copyText } from '../share.js'
 
-export default function ShareCard({ rounds, players, onClose }) {
+export default function ShareCard({ rounds, players, theme, onClose }) {
   const [flash, setFlash] = useState('')
 
   const safeRounds = useMemo(() => rounds.filter((r) => (r.groups || []).length > 0), [rounds])
-  const meta = useMemo(() => ({ players }), [players])
+  const meta = useMemo(() => ({ players, theme }), [players, theme])
   const text = useMemo(() => buildText(safeRounds, meta), [safeRounds, meta])
 
   async function handleCopy() {
@@ -17,7 +17,7 @@ export default function ShareCard({ rounds, players, onClose }) {
   function handleImage() {
     try {
       const canvas = buildImage(safeRounds, meta)
-      downloadCanvas(canvas, '共振-这一局.png')
+      downloadCanvas(canvas, 'RESONANCE-record.png')
       setFlash('图片已存到下载文件夹')
     } catch {
       setFlash('出图失败，改用复制文字吧')
@@ -26,12 +26,12 @@ export default function ShareCard({ rounds, players, onClose }) {
   }
 
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-label="这一局的记录">
+    <div className="sheet" role="dialog" aria-modal="true" aria-label="对局记录">
       <div className="sheet__panel">
         <header className="sheet__head">
           <div>
-            <p className="eyebrow">这一局</p>
-            <h2 className="sheet__title">从头到尾</h2>
+            <p className="eyebrow">GAME RECORD</p>
+            <h2 className="sheet__title">对局记录</h2>
           </div>
           <button className="sheet__x" onClick={onClose} type="button" aria-label="关掉">
             ✕
@@ -39,6 +39,11 @@ export default function ShareCard({ rounds, players, onClose }) {
         </header>
 
         <div className="sheet__body">
+          {theme ? (
+            <p className="lede muted" style={{ fontSize: 12.5, padding: '12px 0 0' }}>
+              题目「{theme}」
+            </p>
+          ) : null}
           {safeRounds.map((r, i) => {
             const rows = (r.groups || []).flatMap((g) =>
               (g.names || []).map((name) => ({ name, word: g.word })),
@@ -46,7 +51,7 @@ export default function ShareCard({ rounds, players, onClose }) {
             return (
               <section className="log" key={`${r.round}-${i}`}>
                 <div className="log__head">
-                  <span className="log__n">第 {r.round || i + 1} 次</span>
+                  <span className="log__n">ROUND {String(r.round || i + 1).padStart(2, '0')}</span>
                   {r.allSame ? <span className="log__tag">对上了</span> : null}
                   {!r.allSame && r.timedOut ? <span className="log__tag">时间到</span> : null}
                 </div>

@@ -14,14 +14,13 @@ function expandRound(round) {
 
 export function buildText(rounds, meta) {
   const lines = []
-  lines.push('共振｜这一局')
-  lines.push('')
-  lines.push(`${meta.players} 个人，${rounds.length} 次对上`)
+  lines.push('RESONANCE · GAME RECORD')
+  lines.push(`共振 · ${meta.players} 人 · ${rounds.length} 轮${meta.theme ? ` · 题目「${meta.theme}」` : ''}`)
   lines.push('')
 
   rounds.forEach((r, i) => {
     const tag = r.allSame ? '　对上了' : r.timedOut ? '　时间到' : ''
-    lines.push(`第 ${r.round || i + 1} 次${tag}`)
+    lines.push(`Round ${r.round || i + 1}${tag}`)
     for (const row of expandRound(r)) {
       lines.push(`${row.name}　${row.word}`)
     }
@@ -30,7 +29,7 @@ export function buildText(rounds, meta) {
 
   const last = rounds[rounds.length - 1]
   if (last?.allSame && last.groups?.[0]) {
-    lines.push(`最后是「${last.groups[0].word}」`)
+    lines.push(`Final word 「${last.groups[0].word}」`)
   }
   return lines.join('\n').trim()
 }
@@ -130,24 +129,33 @@ export function buildImage(rounds, meta) {
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
 
-  // 页眉
+  // 页眉：英文大标题，中文小标题
   ctx.fillStyle = c.accent
-  ctx.font = `600 12px ${SANS}`
+  ctx.font = `600 11px ${SANS}`
   ctx.letterSpacing = '4px'
-  ctx.fillText('RESONANCE', PAD, 84)
+  ctx.fillText('SAME MOMENT · ONE WORD', PAD, 78)
 
   ctx.fillStyle = c.ink
-  ctx.font = `400 50px ${SERIF}`
+  ctx.font = `400 46px ${SERIF}`
+  ctx.letterSpacing = '6px'
+  ctx.fillText('RESONANCE', PAD, 134)
+
+  ctx.fillStyle = c.ink2
+  ctx.font = `400 16px ${SERIF}`
   ctx.letterSpacing = '8px'
-  ctx.fillText('共振 · 这一局', PAD, 150)
+  ctx.fillText('共振', PAD, 170)
+  ctx.letterSpacing = '0px'
 
   ctx.fillStyle = c.ink3
-  ctx.font = `400 14px ${SANS}`
+  ctx.font = `400 13px ${SANS}`
   ctx.letterSpacing = '1px'
+  const themeNote = meta.theme ? ` · 「${meta.theme}」` : ''
   ctx.fillText(
-    `${people.length} 个人 · ${rounds.length} 次${rounds.some((r) => r.timedOut) ? ' · 有到点结算的轮次' : ''}`,
-    PAD,
-    184,
+    `${people.length} PLAYERS · ${rounds.length} ROUNDS${themeNote}${
+      rounds.some((r) => r.timedOut) ? ' · TIMED OUT' : ''
+    }`,
+    PAD + 52,
+    170,
   )
   ctx.letterSpacing = '0px'
 
@@ -231,14 +239,14 @@ export function buildImage(rounds, meta) {
     ctx.fillStyle = c.ink
     ctx.font = `400 22px ${SERIF}`
     ctx.letterSpacing = '2px'
-    ctx.fillText(`最后是「${last.groups[0].word}」`, tableX, footY + 56)
+    ctx.fillText(`Final word 「${last.groups[0].word}」`, tableX, footY + 56)
     ctx.letterSpacing = '0px'
   }
 
   ctx.fillStyle = c.ink3
   ctx.font = `400 12px ${SANS}`
-  ctx.letterSpacing = '2px'
-  ctx.fillText('— 同一时间，同一个词 —', tableX, H - 26)
+  ctx.letterSpacing = '3px'
+  ctx.fillText('SAME MOMENT · SAME WORD', tableX, H - 26)
   ctx.letterSpacing = '0px'
 
   return cv

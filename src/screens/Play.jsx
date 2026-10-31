@@ -90,7 +90,13 @@ export default function Play({ room, myId, onSubmit, onLeave }) {
         </>
       ) : (
         <>
-          <p className="kicker">第 {room.round} 次</p>
+          <p className="kicker">ROUND {room.round}</p>
+          {room.theme ? (
+            <p className="prompt">
+              <span className="prompt__label">题目</span>
+              <span className="prompt__word">{room.theme}</span>
+            </p>
+          ) : null}
           <h1 className="verdict">写一个词</h1>
           <p className="verdict__note">
             第一反应的那个就是对的那个。想到什么写什么，别改。

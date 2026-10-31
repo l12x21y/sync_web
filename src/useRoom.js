@@ -198,6 +198,10 @@ export function useRoom() {
   const submit = useCallback((word) => send({ type: 'submit', word }), [send])
   const next = useCallback(() => send({ type: 'next' }), [send])
   const again = useCallback(() => send({ type: 'again' }), [send])
+  const updateSettings = useCallback(
+    (patch) => send({ type: 'settings', ...patch }),
+    [send],
+  )
 
   // 恢复会话时别一直卡在启动页
   useEffect(() => {
@@ -237,6 +241,7 @@ export function useRoom() {
     submit,
     next,
     again,
+    updateSettings,
     leave,
   }
 }

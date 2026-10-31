@@ -307,10 +307,19 @@ body {
 .hero__title {
   font-family: var(--serif);
   font-weight: 400;
-  font-size: clamp(64px, 9.4vw, 112px);
+  font-size: clamp(52px, 7.6vw, 92px);
   line-height: 0.98;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.06em;
   margin: 0;
+}
+
+/* 英文标题下方的中文小标题 */
+.hero__cn {
+  font-family: var(--serif);
+  font-size: 19px;
+  letter-spacing: 0.62em;
+  color: var(--ink-2);
+  margin: 20px 0 0;
 }
 
 /* 标题右侧的一小段荧光下划线 */
@@ -802,6 +811,63 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* 答题页的题目块：有小标题时垫在「写一个词」上方 */
+.prompt {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 0 0 14px;
+}
+
+.prompt__label {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  flex: none;
+}
+
+.prompt__word {
+  font-family: var(--serif);
+  font-size: clamp(26px, 3.2vw, 40px);
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------- 大厅设置 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 13px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--ink-2);
+  border-color: var(--ink-3);
+}
+
+.chip--on {
+  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--panel-2);
+}
+
 /* --------------------------------------------------------- 布局工具 */
 .stack {
   display: flex;
@@ -1110,7 +1176,12 @@ body {
   }
 
   .hero__title {
-    font-size: clamp(46px, 13.5vw, 66px);
+    font-size: clamp(38px, 10.5vw, 60px);
+  }
+
+  .hero__cn {
+    font-size: 16px;
+    margin-top: 16px;
   }
 
   .hero__title::after {

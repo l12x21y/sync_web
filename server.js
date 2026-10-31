@@ -36,10 +36,17 @@ const wss = new WebSocketServer({ server, path: '/ws' })
 const MAX_PLAYERS = 16
 const MAX_WORD_LEN = 8
 const MAX_NAME_LEN = 12
+const MAX_THEME_LEN = 16
 const OFF_KEEP_MS = 90_000
 const ROOM_IDLE_MS = 30 * 60_000
-// 每轮的兜底时间：到点就不再等没交的人，按已交的判一次
-const ROUND_MS = Number(process.env.ROUND_SECONDS || 60) * 1000
+// 每轮写词限时：默认 30 秒，可用 env 调整出厂值；房主在大厅里能改
+const DEFAULT_ROUND_SECONDS = clampInt(process.env.ROUND_SECONDS || 30, 5, 300)
+
+function clampInt(v, lo, hi) {
+  const n = Math.round(Number(v))
+  if (!Number.isFinite(n)) return lo
+  return Math.min(hi, Math.max(lo, n))
+}
 
 /** @type {Map<string, any>} */
 const rooms = new Map()
@@ -65,6 +72,9 @@ function createRoom() {
     deadline: 0,
     timer: null,
     timedOut: false,
+    // 房主可改的设置
+    roundSeconds: DEFAULT_ROUND_SECONDS,
+    theme: '',
     touchedAt: Date.now(),
   }
   rooms.set(room.code, room)
@@ -170,7 +180,10 @@ function beginRound(room) {
   room.reveal = null
   room.timedOut = false
   room.phase = 'answering'
-  room.deadline = Date.now() + ROUND_MS
+  const roundMs = room.roundSeconds * 1000
+  // 宽限期跟着限时走：限时越短，到点后留的缓冲也短
+  const graceMs = Math.max(15, Math.round(room.roundSeconds / 2)) * 1000
+  room.deadline = Date.now() + roundMs
   clearRoundTimer(room)
   room.timer = setTimeout(() => {
     room.timer = null
@@ -179,18 +192,18 @@ function beginRound(room) {
     // 到点先按已交的结算；人太少就再宽限一次
     if (!maybeReveal(room, { force: true })) {
       room.timedOut = false
-      room.deadline = Date.now() + 30_000
+      room.deadline = Date.now() + graceMs
       room.timer = setTimeout(() => {
         room.timer = null
         if (room.phase !== 'answering') return
         room.timedOut = true
         maybeReveal(room, { force: true })
         broadcast(room)
-      }, 30_000)
+      }, graceMs)
     } else {
       broadcast(room)
     }
-  }, ROUND_MS)
+  }, roundMs)
 }
 
 // ---------------------------------------------------------------- 下发
@@ -201,6 +214,8 @@ function publicRoom(room) {
     phase: room.phase,
     hostId: room.hostId,
     round: room.round,
+    roundSeconds: room.roundSeconds,
+    theme: room.theme,
     reveal: room.phase === 'reveal' ? room.reveal : null,
     players: room.players.map((p) => ({
       id: p.id,
@@ -301,6 +316,20 @@ function handleMessage(ws, msg) {
       ws.playerId = p.id
       send(ws, { type: 'joined', playerId: p.id, room: roomFor(r, p) })
       broadcast(r)
+      return
+    }
+
+    case 'settings': {
+      if (!room || !player) return sendError(ws, '你还没进房间')
+      if (room.hostId !== player.id) return sendError(ws, '只有房主能改设置')
+      if (room.phase !== 'lobby') return sendError(ws, '开局以后不能改，等这一局散了')
+      if (msg.roundSeconds != null) {
+        room.roundSeconds = clampInt(msg.roundSeconds, 5, 300)
+      }
+      if (msg.theme != null) {
+        room.theme = displayWord(String(msg.theme ?? '')).slice(0, MAX_THEME_LEN)
+      }
+      broadcast(room)
       return
     }
 
@@ -458,6 +487,6 @@ setInterval(() => {
 }, 5 * 60_000).unref?.()
 
 server.listen(PORT, () => {
-  console.log(`\n  同词相见 · ${PROD ? '生产' : '开发'}模式`)
+  console.log(`\n  RESONANCE · ${PROD ? '生产' : '开发'}模式`)
   console.log(`  http://localhost:${PORT}\n`)
 })

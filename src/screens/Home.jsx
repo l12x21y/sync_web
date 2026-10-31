@@ -119,8 +119,9 @@ export default function Home({ onCreate, onJoin }) {
         </div>
       }
     >
-      <p className="kicker">RESONANCE</p>
-      <h1 className="hero__title">共振</h1>
+      <p className="kicker">SAME MOMENT · ONE WORD</p>
+      <h1 className="hero__title">RESONANCE</h1>
+      <p className="hero__cn">共振</p>
       <p className="hero__sub">
         同一时间，几个人各自写下一个词。
         <br />

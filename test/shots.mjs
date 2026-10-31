@@ -177,6 +177,9 @@ async function main() {
 
     await waitFor(`document.querySelectorAll('.row').length >= ${guests.length + 1}`)
     await sleep(500)
+    // 房主设个题目，顺便验证题目块渲染（450ms 防抖后自动提交）
+    await typeInto('.settings .field', '一种热带水果')
+    await sleep(1100)
     await shot(`${prefix}-2-lobby`)
 
     await clickText('开始')
@@ -209,8 +212,8 @@ async function main() {
     await sleep(1000)
     await shot(`${prefix}-6-hit`)
 
-    // 这一局的完整记录
-    await clickText('这一局记录')
+    // 对局记录
+    await clickText('对局记录')
     await waitFor(`document.querySelector('.sheet__panel')`)
     await sleep(700)
     await shot(`${prefix}-8-log`)

@@ -12,12 +12,12 @@ function Splash() {
           className="pane pane--main pane--main--center"
           style={{ alignItems: 'center', textAlign: 'center' }}
         >
-          <p className="kicker">正在回到原来的位子</p>
+          <p className="kicker">RECONNECTING</p>
           <h1
             className="title"
             style={{ fontSize: 28, letterSpacing: '0.2em', opacity: 0.55, marginTop: 6 }}
           >
-            共振
+            RESONANCE
           </h1>
         </div>
       </div>
@@ -26,7 +26,7 @@ function Splash() {
 }
 
 export default function App() {
-  const { room, myId, error, booting, isHost, create, join, start, submit, next, again, leave } =
+  const { room, myId, error, booting, isHost, create, join, start, submit, next, again, updateSettings, leave } =
     useRoom()
 
   let screen
@@ -35,7 +35,16 @@ export default function App() {
   } else if (!room) {
     screen = <Home onCreate={create} onJoin={join} />
   } else if (room.phase === 'lobby') {
-    screen = <Lobby room={room} myId={myId} isHost={isHost} onStart={start} onLeave={leave} />
+    screen = (
+      <Lobby
+        room={room}
+        myId={myId}
+        isHost={isHost}
+        onStart={start}
+        onSettings={updateSettings}
+        onLeave={leave}
+      />
+    )
   } else if (room.phase === 'answering') {
     screen = <Play room={room} myId={myId} onSubmit={submit} onLeave={leave} />
   } else {

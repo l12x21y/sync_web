@@ -11,6 +11,7 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
     <ShareCard
       rounds={room.rounds || []}
       players={r.answered}
+      theme={room.theme || ''}
       onClose={() => setShowLog(false)}
     />
   ) : null
@@ -38,7 +39,7 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
               ))}
             </div>
             <p className="lede muted" style={{ fontSize: 12.5, marginTop: 22 }}>
-              第 {r.round} 次就对上了，这局到此为止。
+              第 {r.round} 轮就对上了。
             </p>
           </>
         }
@@ -69,7 +70,7 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
               type="button"
               style={{ flex: 'none', width: 132 }}
             >
-              这一局记录
+              对局记录
             </button>
           </div>
         </div>
@@ -105,7 +106,7 @@ export default function Reveal({ room, isHost, onNext, onAgain, onLeave }) {
             </p>
           )}
           <button className="linkish" onClick={() => setShowLog(true)} type="button">
-            看这 {r.round} 次的记录
+            对局记录
           </button>
         </div>
       </div>
