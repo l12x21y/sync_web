@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { buildText, buildImage, downloadCanvas, copyText } from '../share.js'
+import { buildText, buildImage, downloadCanvas, copyText, isMobileDevice, openSaveSheet } from '../share.js'
 import { describeDistance } from '../../shared/distance.js'
 
 export default function ShareCard({ rounds, players, theme, distance = 0, onClose }) {
@@ -19,6 +19,12 @@ export default function ShareCard({ rounds, players, theme, distance = 0, onClos
   function handleImage() {
     try {
       const canvas = buildImage(safeRounds, meta)
+      // 手机上 a[download] 会被忽略（微信/iOS Safari），改成浮层里长按保存
+      if (isMobileDevice()) {
+        openSaveSheet(canvas, 'RESONANCE-record.png')
+        setFlash('')
+        return
+      }
       downloadCanvas(canvas, 'RESONANCE-record.png')
       setFlash('图片已存到下载文件夹')
     } catch {

@@ -1050,6 +1050,68 @@ body {
   margin: 10px 0 0;
 }
 
+/* --------------------------------------------------------- 长按存图浮层（手机） */
+.savesheet {
+  position: fixed;
+  inset: 0;
+  z-index: 70; /* 压在记录浮层（60）之上 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));
+  background: rgba(17, 97, 107, 0.5);
+}
+
+.savesheet__box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(560px, 100%);
+  max-height: 100%;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.savesheet__tip {
+  margin: 0;
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+/* 图片可滚动，长按弹的是系统菜单，别让手指一滑就跑掉 */
+.savesheet__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 190px);
+  object-fit: contain;
+  border-radius: 6px;
+  -webkit-touch-callout: default;
+  user-select: auto;
+  touch-action: pan-y;
+}
+
+.savesheet__row {
+  display: flex;
+  gap: 10px;
+}
+
+.savesheet__row > * {
+  flex: 1;
+}
+
+/* 下载是个 <a>，按按钮的样子来（含居中对齐，否则字会贴左上） */
+.savesheet__row a.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .log {
   padding: 15px 0;
   border-bottom: 1px solid var(--line-soft);

@@ -160,10 +160,27 @@ async function main() {
       deviceScaleFactor: dsf,
       mobile,
     })
+    // iPhone UA：让页面走手机分支，同时保留手机视口
+    if (mobile) {
+      await cdp.send('Emulation.setUserAgentOverride', {
+        userAgent:
+          'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        acceptLanguage: 'zh-CN',
+        platform: 'iPhone',
+      })
+    } else {
+      await cdp.send('Emulation.setUserAgentOverride', {
+        userAgent:
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+        acceptLanguage: 'zh-CN',
+        platform: 'Win32',
+      })
+    }
 
     // 清掉上一轮留下的座位，保证从首页进
     await cdp.send('Page.navigate', { url: APP })
-    await sleep(700)
+    // 等页面真的落到应用域名再动 localStorage（刚 navigate 时还是 about:blank 会报 SecurityError）
+    await waitFor(`location.origin === ${JSON.stringify(new URL(APP).origin)}`)
     await evalJs('localStorage.clear()')
     await cdp.send('Page.reload', {})
     await waitFor(`document.querySelector('#nick')`)
@@ -263,6 +280,42 @@ async function main() {
     await waitFor(`document.querySelector('.sheet__panel')`)
     await sleep(700)
     await shot(`${prefix}-8-log`)
+
+    // 存图：手机上应当弹出「长按保存」浮层（a[download] 在 iOS/微信里无效）
+    await clickText('存成图片')
+    await sleep(600)
+    const save = await evalJs(`(() => {
+      const mask = document.querySelector('.savesheet')
+      const img = mask?.querySelector('.savesheet__img')
+      return {
+        open: !!mask,
+        src: img ? img.getAttribute('src')?.slice(0, 22) : null,
+        w: img ? img.naturalWidth : 0,
+        h: img ? img.naturalHeight : 0,
+        tip: mask?.querySelector('.savesheet__tip')?.textContent || '',
+      }
+    })()`)
+    record('存图浮层', save.open ? `已弹出 · ${save.tip}` : '未弹出')
+    if (save.open) record('浮层里的图', `${save.src}… ${save.w}×${save.h}`)
+    if (mobile) {
+      assert(save.open, '手机点「存成图片」弹出长按保存浮层')
+      assert(save.w > 600 && save.h > 300, `浮层里的图是完整尺寸（${save.w}×${save.h}）`)
+      await shot(`${prefix}-8b-save`)
+      const btnH = await evalJs(
+        `[...document.querySelectorAll('.savesheet__row .btn')].map((b) => Math.round(b.getBoundingClientRect().height)).join('/')`,
+      )
+      record('浮层按钮高度', btnH)
+      assert(
+        btnH.split('/').every((h) => Number(h) >= 40),
+        `「下载 / 好了」两个按钮一样高（${btnH}）`,
+      )
+      await clickText('好了')
+      await sleep(300)
+      assert(!(await evalJs(`!!document.querySelector('.savesheet')`)), '点「好了」浮层关掉')
+    } else {
+      assert(!save.open, '桌面走直接下载，不弹长按浮层')
+    }
+
     await clickText('✕')
     await sleep(300)
 
@@ -318,6 +371,13 @@ async function main() {
   })
 
   // 邀请链接：带 ?r= 打开应当直接落到「进别人的」并填好房号
+  // 上一趟把 UA 改成了 iPhone，这里先拨回桌面，否则首页还是手机版
+  await cdp.send('Emulation.setUserAgentOverride', {
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+    acceptLanguage: 'zh-CN',
+    platform: 'Win32',
+  })
   await cdp.send('Emulation.setDeviceMetricsOverride', {
     width: 1440,
     height: 900,

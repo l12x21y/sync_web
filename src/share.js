@@ -325,6 +325,73 @@ export function downloadCanvas(canvas, filename) {
   a.remove()
 }
 
+/** 手机（尤其 iOS Safari、微信内置浏览器）不认 a[download]，这里统一判断 */
+export function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const touch = navigator.maxTouchPoints > 1
+  // iPadOS 13+ 伪装成 Mac，用触点数兜住
+  return /Android|iPhone|iPad|iPod|Mobile|HarmonyOS|MicroMessenger/i.test(ua) || (touch && /Mac/.test(ua))
+}
+
+/**
+ * 手机上的存图路径：把图渲染成 <img> 放进全屏浮层，让用户长按/右键保存。
+ * iOS 和微信里 a[download] 会被静默忽略，长按存图是唯一稳的路子。
+ */
+export function openSaveSheet(canvas, filename) {
+  const url = canvas.toDataURL('image/png')
+
+  const mask = document.createElement('div')
+  mask.className = 'savesheet'
+  mask.setAttribute('role', 'dialog')
+  mask.setAttribute('aria-label', '长按图片保存')
+
+  const box = document.createElement('div')
+  box.className = 'savesheet__box'
+
+  const tip = document.createElement('p')
+  tip.className = 'savesheet__tip'
+  tip.textContent = '长按图片 → 存到相册'
+
+  const img = document.createElement('img')
+  img.className = 'savesheet__img'
+  img.src = url
+  img.alt = '对局记录分享图'
+
+  const row = document.createElement('div')
+  row.className = 'savesheet__row'
+
+  const dl = document.createElement('a')
+  dl.className = 'btn btn--ghost btn--sm'
+  dl.href = url
+  dl.download = filename
+  dl.textContent = '下载'
+
+  const close = document.createElement('button')
+  close.className = 'btn btn--sm'
+  close.type = 'button'
+  close.textContent = '好了'
+
+  const dismiss = () => {
+    mask.remove()
+    window.removeEventListener('keydown', onKey)
+  }
+  const onKey = (e) => {
+    if (e.key === 'Escape') dismiss()
+  }
+  close.addEventListener('click', dismiss)
+  mask.addEventListener('click', (e) => {
+    if (e.target === mask) dismiss()
+  })
+  window.addEventListener('keydown', onKey)
+
+  row.append(dl, close)
+  box.append(tip, img, row)
+  mask.append(box)
+  document.body.appendChild(mask)
+  return dismiss
+}
+
 export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text)
