@@ -43,9 +43,15 @@ function headers(key) {
 }
 
 /** 把本地 stats 文件整份推到远端（幂等 upsert） */
-export async function pushNow({ file, log = console } = {}) {
+export async function pushNow({ file, ensure = null, log = console } = {}) {
   const { url, key, table } = conf()
   if (!url || !key) return false
+  // 实例刚启动还没发生过任何事件时，文件还不存在——先落一次盘
+  if (!fs.existsSync(file)) ensure?.()
+  if (!fs.existsSync(file)) {
+    log.log?.('[backup] 本地还没有统计文件，跳过本次推送')
+    return false
+  }
   const payload = JSON.parse(fs.readFileSync(file, 'utf8'))
   const res = await fetch(`${url}/rest/v1/${table}?on_conflict=id`, {
     method: 'POST',
@@ -84,12 +90,12 @@ export async function restoreFromRemote({ file, log = console } = {}) {
 }
 
 /** 启动定期推送；返回 { pushNow } 供退出前再推一次 */
-export function startBackup({ file, log = console } = {}) {
+export function startBackup({ file, ensure = null, log = console } = {}) {
   if (!backupConfigured()) return null
 
   const attempt = async (label) => {
     try {
-      await pushNow({ file, log })
+      await pushNow({ file, ensure, log })
     } catch (err) {
       log.warn?.(`[backup] ${label}推送失败：`, err.message)
     }

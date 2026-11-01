@@ -21,7 +21,9 @@ const stats = createStats({
   file: STATS_FILE,
   disabled: process.env.STATS_DISABLE === '1',
 })
-const statsBackup = backupConfigured() ? startBackup({ file: STATS_FILE }) : null
+const statsBackup = backupConfigured()
+  ? startBackup({ file: STATS_FILE, ensure: () => stats.save() })
+  : null
 const STATS_TOKEN = process.env.STATS_TOKEN || ''
 
 // ---------------------------------------------------------------- 服务器
@@ -693,7 +695,9 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
     stats.save()
     if (statsBackup) {
       // 给远端请求留 3 秒，推完（或超时）再退
-      statsBackup.pushNow().catch(() => {})
+      statsBackup
+        .pushNow({ ensure: () => stats.save() })
+        .catch(() => {})
       setTimeout(() => process.exit(0), 3000)
     } else {
       process.exit(0)
