@@ -1,165 +1,81 @@
 # RESONANCE · 共振
 
-Same moment, one word. 同一时间各写一个词，全都一样才说明想的是同一件事。
+**Same moment, one word.** 同一时刻，各写一个词——全都一样，才说明你们想的是同一件事。
 
-![RESONANCE](docs/home.png)
+<p align="center"><img src="docs/home.png" width="720" alt="RESONANCE 首页"></p>
 
-React + 一个 WebSocket 服务，房间状态全部在服务端内存里，不需要数据库。
+这是一个关于**默契**的小游戏：没有题库、没有计分、没有输赢。几个人坐进同一个房间，在同一个瞬间各自写下心里冒出来的那个词。如果所有人写的是同一个词，房间就会为你点亮——这一刻，你们真的想到了一起。
 
-- 桌面是双栏版面（左边题目/房号，右边在场的人），窄屏自动回落单栏，手机上一样好用
-- 2–16 人，4 位房号，房间可分享成链接（`?r=8321`），点开直接跳到「进房间」并填好房号
-- 刷新页面不会丢座位，掉线 90 秒内回来还坐原位
-## 跑起来
+**在手机或电脑浏览器打开就能玩，无需安装：**
 
-```bash
-npm install
-npm run dev          # http://localhost:5173
-```
+<p align="center">
+  <a href="https://sync-web-trh2.onrender.com/"><b>→ 开始一局共振</b></a>
+</p>
 
-改端口：`PORT=8080 npm run dev`
+---
 
-## 玩法
+## 怎么玩
 
-- 4 位数字房号，2–16 人，房主开局
-- 默认**没有题目**（纯默契）；房主也可以在大厅里出一道题（比如「一种热带水果」），全员照着题想
-- 所有人同时想一个词（1–8 字），谁先交都不影响，交完互相看不到
-- 全员交完立即揭晓，按词分组，把每个人填的词和名字都摆出来
-- 全一样 → 撞上了，这一局结束；不一样 → 房主点「再写一次」
-- 一直填到所有人都一样为止，没有题数，也不计分
-- **默契里程**：一轮没对上，在场每人背 200 m，累计出「这局要一起跑完的距离」；页面和揭晓页都会显示，配点好玩的参照——操场几圈、几个马拉松、够不够从上海跑到北京
-- **弹幕发言**：从建房开始随时冒一句——底部输入一句话，所有人的屏幕上飘过一条气泡，飘过就散，不留历史、不占版面；一句话最多 30 个字，800ms 内的连发会被悄悄丢掉
-- 结束后可以看**对局记录**：浮层里逐轮列出，能复制成文字或存成一张矩阵图（人是一列，轮次是一行），里程板块和每轮背了多少米都在
-- 存图分两条路：电脑上直接下载到「下载」文件夹；手机上（含微信内置浏览器、iOS Safari）不认 `a[download]`，改成弹一个全屏浮层，**长按图片存到相册**，点遮罩收起
+1. **建房** —— 拿到一个 4 位房号，把邀请链接发给朋友，点开直接进房
+2. **同时写** —— 每个人在输入框里写下想到的词（1–8 个字），互相看不见
+3. **揭晓** —— 全员交完的瞬间，所有词按组摆开，谁写了什么一目了然
+4. **再来** —— 没对上？房主点一下，马上开下一轮，直到全场共振
 
-![揭晓](docs/reveal.png)
+<p align="center"><img src="docs/reveal.png" width="720" alt="揭晓时刻"></p>
 
-![答题页 · 弹幕](docs/play.png)
+全一致的那一刻，就是这个游戏全部的意义。
 
-![分享图](docs/share.png)
+## 它为什么好玩
 
-### 房主设置（大厅里改，开局后锁定）
+**越熟的人，越容易共振。** 第一次玩可能各写各的，但玩到第五轮、第十轮，你会发现某两个人总能在没有交流的情况下写下同一个词。它把「我们有多有默契」变成了一件看得见的事——适合朋友聚会、情侣、社团破冰，也适合那些想测试一下「我们是不是心有灵犀」的人。
 
-| 设置 | 默认 | 说明 |
-| --- | --- | --- |
-| 每轮限时 | 30 秒 | 15 / 30 / 45 / 60 / 90 / 120 秒可选；到点没交的人不参与判定，按已交的结算 |
-| 题目 | 空 | 最多 16 个字，留空就是纯默契；题目会出现在答题页和分享图上 |
+- **纯默契模式**：不留题目，全靠心电感应
+- **出题模式**：房主丢一道题（比如「一种热带水果」），看大家会不会都想到芒果
 
-服务端出厂值可用 `ROUND_SECONDS=30` 环境变量调，房主在房间里改的设置优先于出厂值。
+## 默契里程
 
-判定口径在 `shared/normalize.js`：去首尾空白、全角转半角、转小写、去所有空白和标点。
-所以「苹果」「苹果！」「苹果。」算同一个词，「苹果」和「红苹果」不算。
+对不上没关系——**没对上的一轮，在场每个人背起 200 米**。这些米数累加成「你们这局要一起跑完的距离」，页面会告诉你它有多远：操场要绕几圈、相当于几个马拉松、够不够从上海走到北京。
 
-## 结构
+默契越好，背得越少。
 
-```
-server.js              Express + ws；dev 时挂 Vite middleware，--prod 时托管 dist
-shared/normalize.js    判同口径（前后端共用）
-shared/distance.js     默契里程的账本和参照物（前后端共用）
-src/useRoom.js         WebSocket 连接、状态同步、刷新续座、邀请链接优先
-src/components/Shell.jsx  顶栏 + 两栏外壳（窄屏自动单栏）
-src/components/Bubbles.jsx  弹幕气泡层（每条气泡各占一条轨道，飘过即散）＋ ChatBar 底部细输入
-src/laneMath.js        弹幕轨道分配（挑最早空出来的轨道，定死不再跳轨）
-src/screens/           Home / Lobby / Play / Reveal
-test/smoke.mjs         16 个 ws 客户端跑完整一局，46 条断言（含设置/限时/题目/里程/弹幕/统计）
-test/lanes.mjs         弹幕轨道分配单测（铺轨、排队、不跳轨、轨道复用）
-test/shots.mjs         CDP 驱动无头 Chrome，桌面 1440×900 + 手机 390×844 各走一遍（含手机长按存图）
-server/stats.js        访问统计（JSON 落盘，匿名指纹去重，不存原始 IP/UA）
-server/backup.js       统计备份到 Supabase（可选，配置环境变量即启用）
-render.yaml            Render Blueprint
-```
+## 弹幕：房间里的低语
 
-## 访问统计
+从建房那一刻起，你随时可以在底部说一句话。它不会留在聊天记录里，只会化作一条气泡，从所有人的屏幕上轻轻飘过，然后消失。
 
-服务端自带一套轻量统计，无数据库、无第三方脚本：
+<p align="center"><img src="docs/play.png" width="720" alt="答题页与弹幕"></p>
 
-- 每次页面打开打一次 `/api/hit` 记 PV；带 `?r=` 的算「邀请链接打开」
-- UV / 会话按 **IP+UA 的 sha256 截断指纹**去重，不存原始 IP 和 UA
-- 建房、落座、轮数、对局、弹幕条数也在记，后台能看到常用昵称排行
-- 数据落在 `data/stats.json`（已 gitignore），每次变动 2 秒后合并写入，保留 120 天按天明细
+说过就散，不留痕迹——像房间里掠过的一阵风。
 
-后台面板：`/admin`。
+## 对局记录
 
-- 本机跑（没设 `STATS_TOKEN`）：只有 `127.0.0.1` 能打开，直接访问 `http://localhost:5173/admin`
-- 部署后：在 Render 的 Environment 里加 `STATS_TOKEN`（值自己定，一串随机的字符就行），然后开
-  `https://<域名>/admin?token=你设的密钥`；不设 token 线上就只有本机能看
-- `STATS_DISABLE=1` 整体关掉
+一局结束，可以翻开完整记录：每一轮、每个人、每个词，整整齐齐一张矩阵。可以复制成文字发到群里，也可以存成一张图——
 
-### 长期保存：每天自动备份到 Supabase（可选）
+- **电脑**上直接下载到本地
+- **手机**（包括微信里打开）长按图片存到相册
 
-Render 免费档的磁盘是临时的，实例一重建 `data/stats.json` 就没了。配一个 Supabase 备份，实例重建也能接着记：
+<p align="center"><img src="docs/share.png" width="420" alt="分享图"></p>
 
-**① Supabase 建表**（不用把仓库连到 Supabase，建个表、拿两个值就行）：
-项目里 SQL Editor 跑：
+<p align="center"><img src="docs/save-mobile.png" width="300" alt="手机长按存图"></p>
 
-```sql
-create table if not exists sync_stats (
-  id text primary key,
-  payload jsonb not null,
-  updated_at timestamptz not null default now()
-);
-```
+## 亮点一览
 
-RLS 开不开都行——我们用的是 service_role 密钥，它绕过 RLS；**不要**给这张表建 anon 策略。
+- 🎯 **无题库无计分** —— 唯一的胜负是「全员一致」
+- 🔗 **一条链接进房** —— `?r=房号`，点开即入座
+- 🔄 **刷新不丢座** —— 掉线 90 秒内回来，还坐原位
+- 📏 **默契里程** —— 把默契量化成一段要一起跑完的路
+- 💬 **即飘即散的弹幕** —— 不留历史，不打扰版面
+- 🖼️ **一键生成记录图** —— 人是列、轮次是行，发群里正合适
+- 📱 **手机电脑都好用** —— 窄屏自动回落单栏，微信内打开也能玩
+- 🪶 **轻** —— 没有数据库，一个进程撑起整个房间
 
-**② Render 配两个环境变量**（Environment → Add）：
+## 适合谁
 
-| Key | Value | 从哪拿 |
-| --- | --- | --- |
-| `SUPABASE_URL` | `https://xxxx.supabase.co` | 项目 Settings → API → Project URL |
-| `SUPABASE_SERVICE_KEY` | `eyJhbGciOi...`（很长） | 项目 Settings → API → `service_role` secret |
+朋友聚会冷场的时候 · 线上团建的开场 · 情侣之间的小实验 · 社团破冰的第三个小游戏 · 或者只是想确认一下，那个人是不是真的懂你。
 
-**③ 就完事了**。行为：启动 15 秒后推第一次、之后每 6 小时推一次（退出前也推）；本地文件丢了的实例重启时会自动从 Supabase 把备份拉回来接着记。`SUPABASE_STATS_TABLE` 可换表名，默认 `sync_stats`。
+---
 
-> `service_role` 密钥权限很大，只能放在 Render 这类服务端环境变量里，别提交进仓库、别放到前端。
+<p align="center">
+  <b>2–16 人 · 4 位房号 · 一直填到全都一样为止</b>
+</p>
 
-## 测试
-
-```bash
-node server.js            # 先起服务
-node test/smoke.mjs       # 逻辑冒烟（16 人在场、越权拦截、判同、离开）
-node test/lanes.mjs       # 弹幕轨道分配单测
-node test/shots.mjs       # 出截图到 shots/
-```
-
-生产模式也跑同一套：
-
-```bash
-npm run build
-PORT=5180 node server.js --prod
-WS_URL=ws://localhost:5180/ws node test/smoke.mjs
-```
-
-## 部署
-
-这个应用**必须有常驻 WebSocket**，所以能选的平台不多。
-
-| 方案 | 能不能用 | 说明 |
-| --- | --- | --- |
-| **Render（单服务）** | ✅ 推荐 | 一个 Web Service 同时托管静态文件和 `/ws`，同域，不用配 CORS。免费档 15 分钟没流量会休眠，冷启动 30–50 秒 |
-| Netlify 前端 + Render 后端 | ⚠️ 能，但没必要 | Netlify 只能托管静态文件，长连接还得落到 Render；变成两个域名 + 一个 `VITE_WS_URL`，多一处故障点 |
-| Netlify 单独 | ❌ | Functions 撑不住长连接，静态托管更没有服务端 |
-| Supabase Realtime 替代后端 | ⚠️ 能，但要重写 | 房间状态、房主迁移、断线重连都得搬到客户端；免费档 Realtime 有并发上限，且服务端权威逻辑没了，判同和准入容易被绕 |
-| Railway / Fly / VPS | ✅ | 一样是常驻进程，`npm start` 即可 |
-
-### Render 一把梭
-
-仓库里带了 `render.yaml`，控制台 **New → Blueprint** 选这个仓库，直接起：
-
-```yaml
-buildCommand: npm ci && npm run build
-startCommand: npm start          # node server.js --prod
-healthCheckPath: /healthz
-```
-
-起来之后拿到 `https://<名称>.onrender.com`，把这个链接发给朋友就行。
-房间页有「复制邀请链接」，生成的是 `https://<域名>/?r=房号`。
-
-> 免费档休眠：第一次打开要等 30–50 秒。想避免就用 cron-job.org / UptimeRobot
-> 每 10 分钟打一下 `https://<域名>/healthz`（免费额度够用）。
-
-## 已知取舍
-
-- 房间状态在内存里，进程重启就没了；也没做多实例广播（要上 Redis adapter 才能多开）
-- 掉线保留座位 90 秒，刷新页面能续上；超时会被清掉
-- 房主掉线会自动把房主身份交给下一个在线的人
-- 一局最多 16 人，再多游戏体验就散了
+<p align="center">想看实现细节？请翻 <a href="TECHNICAL.md">TECHNICAL.md</a>（架构、部署、统计与测试）</p>
