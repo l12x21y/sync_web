@@ -64,6 +64,7 @@ test/smoke.mjs         16 个 ws 客户端跑完整一局，46 条断言（含�
 test/lanes.mjs         弹幕轨道分配单测（铺轨、排队、不跳轨、轨道复用）
 test/shots.mjs         CDP 驱动无头 Chrome，桌面 1440×900 + 手机 390×844 各走一遍（含手机长按存图）
 server/stats.js        访问统计（JSON 落盘，匿名指纹去重，不存原始 IP/UA）
+server/backup.js       统计备份到 Supabase（可选，配置环境变量即启用）
 render.yaml            Render Blueprint
 ```
 
@@ -79,8 +80,37 @@ render.yaml            Render Blueprint
 后台面板：`/admin`。
 
 - 本机跑（没设 `STATS_TOKEN`）：只有 `127.0.0.1` 能打开，直接访问 `http://localhost:5173/admin`
-- 部署后：设环境变量 `STATS_TOKEN=你的一串密钥`，然后开 `https://<域名>/admin?token=你的密钥`；不设 token 线上就只有本机能看
+- 部署后：在 Render 的 Environment 里加 `STATS_TOKEN`（值自己定，一串随机的字符就行），然后开
+  `https://<域名>/admin?token=你设的密钥`；不设 token 线上就只有本机能看
 - `STATS_DISABLE=1` 整体关掉
+
+### 长期保存：每天自动备份到 Supabase（可选）
+
+Render 免费档的磁盘是临时的，实例一重建 `data/stats.json` 就没了。配一个 Supabase 备份，实例重建也能接着记：
+
+**① Supabase 建表**（不用把仓库连到 Supabase，建个表、拿两个值就行）：
+项目里 SQL Editor 跑：
+
+```sql
+create table if not exists sync_stats (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+```
+
+RLS 开不开都行——我们用的是 service_role 密钥，它绕过 RLS；**不要**给这张表建 anon 策略。
+
+**② Render 配两个环境变量**（Environment → Add）：
+
+| Key | Value | 从哪拿 |
+| --- | --- | --- |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` | 项目 Settings → API → Project URL |
+| `SUPABASE_SERVICE_KEY` | `eyJhbGciOi...`（很长） | 项目 Settings → API → `service_role` secret |
+
+**③ 就完事了**。行为：启动 15 秒后推第一次、之后每 6 小时推一次（退出前也推）；本地文件丢了的实例重启时会自动从 Supabase 把备份拉回来接着记。`SUPABASE_STATS_TABLE` 可换表名，默认 `sync_stats`。
+
+> `service_role` 密钥权限很大，只能放在 Render 这类服务端环境变量里，别提交进仓库、别放到前端。
 
 ## 测试
 

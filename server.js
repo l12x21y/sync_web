@@ -7,16 +7,21 @@ import { WebSocketServer } from 'ws'
 import { normalizeWord, displayWord } from './shared/normalize.js'
 import { PER_ROUND_M } from './shared/distance.js'
 import { createStats } from './server/stats.js'
+import { backupConfigured, restoreFromRemote, startBackup } from './server/backup.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production'
 const PORT = Number(process.env.PORT || 5173)
 
 // ---------------------------------------------------------------- 访问统计
+const STATS_FILE = process.env.STATS_FILE || path.join(__dirname, 'data', 'stats.json')
+// Render 免费档磁盘是临时的：本地没文件时先从 Supabase 把上次的备份拉回来
+if (backupConfigured()) await restoreFromRemote({ file: STATS_FILE })
 const stats = createStats({
-  file: process.env.STATS_FILE || path.join(__dirname, 'data', 'stats.json'),
+  file: STATS_FILE,
   disabled: process.env.STATS_DISABLE === '1',
 })
+const statsBackup = backupConfigured() ? startBackup({ file: STATS_FILE }) : null
 const STATS_TOKEN = process.env.STATS_TOKEN || ''
 
 // ---------------------------------------------------------------- 服务器
@@ -682,10 +687,16 @@ server.listen(PORT, () => {
   console.log('')
 })
 
-// 退出前把没落盘的统计写下去
+// 退出前把没落盘的统计写下去，并往 Supabase 推最后一次
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     stats.save()
-    process.exit(0)
+    if (statsBackup) {
+      // 给远端请求留 3 秒，推完（或超时）再退
+      statsBackup.pushNow().catch(() => {})
+      setTimeout(() => process.exit(0), 3000)
+    } else {
+      process.exit(0)
+    }
   })
 }
