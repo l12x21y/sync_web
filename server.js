@@ -6,18 +6,150 @@ import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
 import { normalizeWord, displayWord } from './shared/normalize.js'
 import { PER_ROUND_M } from './shared/distance.js'
+import { createStats } from './server/stats.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PROD = process.argv.includes('--prod') || process.env.NODE_ENV === 'production'
 const PORT = Number(process.env.PORT || 5173)
 
+// ---------------------------------------------------------------- 访问统计
+const stats = createStats({
+  file: process.env.STATS_FILE || path.join(__dirname, 'data', 'stats.json'),
+  disabled: process.env.STATS_DISABLE === '1',
+})
+const STATS_TOKEN = process.env.STATS_TOKEN || ''
+
 // ---------------------------------------------------------------- 服务器
 const app = express()
+app.set('trust proxy', 1) // Render 反代后面要靠 X-Forwarded-For 拿真实 IP
 const server = http.createServer(app)
 
 app.get('/healthz', (_req, res) => {
   res.json({ ok: true, rooms: rooms.size, uptime: Math.round(process.uptime()) })
 })
+
+// 访问记一笔：前端只在页面打开时打一次（比数静态资源可靠）
+app.get('/api/hit', (req, res) => {
+  const ip = req.ip || req.socket?.remoteAddress
+  const ua = req.get('user-agent') || ''
+  const referral = req.query.ref === '1'
+  stats.pageview({ ip, ua, referer: req.get('referer') || '', referral })
+  res.set('Cache-Control', 'no-store')
+  res.json({ ok: true })
+})
+
+// 后台面板：/admin?token=xxx（没设 STATS_TOKEN 就只能从本机访问）
+function adminAllowed(req) {
+  if (STATS_TOKEN) return req.query.token === STATS_TOKEN
+  const ip = (req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '')
+  return ip === '127.0.0.1' || ip === '::1'
+}
+
+app.get('/api/stats', (req, res) => {
+  if (!adminAllowed(req)) return res.status(403).json({ ok: false, error: '没权限' })
+  res.set('Cache-Control', 'no-store')
+  res.json({
+    ...stats.summary({ days: clampInt(req.query.days || 14, 1, 60) }),
+    live: {
+      rooms: rooms.size,
+      online: [...rooms.values()].reduce((n, r) => n + activePlayers(r).length, 0),
+      uptime: Math.round(process.uptime()),
+    },
+  })
+})
+
+app.get('/admin', (req, res) => {
+  if (!adminAllowed(req)) return res.status(403).type('text/plain; charset=utf-8').send('没权限')
+  res.set('Cache-Control', 'no-store')
+  res.type('html').send(adminPage())
+})
+
+// ---------------------------------------------------------------- 后台面板（纯 HTML，不额外开前端路由）
+function adminPage() {
+  return `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>RESONANCE · 访问统计</title>
+<style>
+  :root{--bg:#ebf4f8;--panel:#fff;--ink:#11616b;--ink2:#3f7d86;--ink3:#7fa3aa;--accent:#dc8b70;--line:#c5d8de;--peach:#fed9cd}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:36px 22px 60px}
+  h1{font:400 30px/1.2 Georgia,"Songti SC",serif;letter-spacing:.08em;margin:0 0 4px}
+  .sub{color:var(--ink3);font-size:12px;letter-spacing:.14em;margin:0 0 26px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-bottom:26px}
+  .card{background:var(--panel);padding:14px 16px}
+  .card b{display:block;font:400 26px/1.15 Georgia,"Songti SC",serif;letter-spacing:.02em}
+  .card span{font-size:11.5px;color:var(--ink3);letter-spacing:.08em}
+  .card small{display:block;color:var(--ink3);font-size:11px;margin-top:2px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid #e8f0f3;font-size:12.5px}
+  th:first-child,td:first-child{text-align:left;font-family:ui-monospace,Menlo,monospace;color:var(--ink2)}
+  th{background:#f4fafc;color:var(--ink3);font-weight:500;font-size:11px;letter-spacing:.08em}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px}
+  @media(max-width:720px){.two{grid-template-columns:1fr}}
+  h2{font-size:11.5px;letter-spacing:.16em;color:var(--ink3);font-weight:500;margin:0 0 8px}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{background:var(--panel);border:1px solid var(--line);padding:3px 9px;font-size:12px}
+  .tag i{color:var(--accent);font-style:normal;margin-left:6px}
+  .live{font-size:12.5px;color:var(--ink2);margin-bottom:20px}
+  .err{color:var(--accent)}
+</style></head>
+<body><div class="wrap">
+  <h1>RESONANCE</h1>
+  <p class="sub">VISITS · 访问统计</p>
+  <div id="live" class="live">载入中…</div>
+  <div class="cards" id="cards"></div>
+  <h2>最近 14 天</h2>
+  <table id="series"></table>
+  <div class="two">
+    <div><h2>常用昵称</h2><div class="tags" id="names"></div></div>
+    <div><h2>说明</h2>
+      <p style="font-size:12.5px;color:var(--ink2);margin:0">
+        PV = 页面被打开的次数；UV = 去重后的独立访客（按 IP+UA 的哈希算，不存原始 IP）。<br>
+        数据存在 <code>data/stats.json</code>，每次变动后 2 秒落盘。
+      </p>
+    </div>
+  </div>
+</div>
+<script>
+const tok = new URLSearchParams(location.search).get('token');
+const url = '/api/stats' + (tok ? '?token=' + encodeURIComponent(tok) : '');
+const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'));
+fetch(url).then((r) => r.json()).then((d) => {
+  if (d.ok === false) throw new Error(d.error || '读不到数据');
+  document.getElementById('live').textContent =
+    '在线 ' + d.live.online + ' 人 · 房间 ' + d.live.rooms + ' 个 · 服务已跑 ' +
+    Math.floor(d.live.uptime / 3600) + ' 小时';
+  const t = d.totals, t0 = d.today;
+  const cards = [
+    ['今日 PV', t0.pv, '累计 ' + fmt(t.pv)],
+    ['今日 UV', t0.uv, '累计 ' + fmt(t.uv)],
+    ['今日会话', t0.visits, '累计 ' + fmt(t.visits)],
+    ['今日新房间', t0.rooms, '累计 ' + fmt(t.rooms)],
+    ['今日份对局', t0.games, '累计 ' + fmt(t.games)],
+    ['今日落座', t0.players, '累计 ' + fmt(t.players)],
+    ['今日轮数', t0.rounds, '累计 ' + fmt(t.rounds)],
+    ['今日弹幕', t0.chats, '累计 ' + fmt(t.chats)],
+    ['邀请链接打开', t0.referral, '累计 ' + fmt(t.referral)],
+  ];
+  document.getElementById('cards').innerHTML = cards.map(([k, v, s]) =>
+    '<div class="card"><b>' + fmt(v) + '</b><span>' + k + '</span><small>' + s + '</small></div>').join('');
+  const rows = d.series.slice().reverse();
+  document.getElementById('series').innerHTML =
+    '<tr><th>日期</th><th>PV</th><th>UV</th><th>会话</th><th>新房间</th><th>对局</th></tr>' +
+    rows.map((r) => '<tr><td>' + r.day + '</td><td>' + fmt(r.pv) + '</td><td>' + fmt(r.uv) +
+      '</td><td>' + fmt(r.visits) + '</td><td>' + fmt(r.rooms) + '</td><td>' + fmt(r.games) + '</td></tr>').join('');
+  document.getElementById('names').innerHTML = d.topNames.length
+    ? d.topNames.map((n) => '<span class="tag">' + n.name + '<i>' + n.count + '</i></span>').join('')
+    : '<span style="color:var(--ink3);font-size:12.5px">还没有人落座</span>';
+}).catch((e) => {
+  document.getElementById('live').innerHTML = '<span class="err">读不到数据：' + e.message + '</span>';
+});
+</script>
+</body></html>`
+}
 
 if (PROD) {
   app.use(express.static(path.join(__dirname, 'dist')))
@@ -175,6 +307,13 @@ function maybeReveal(room, { force = false } = {}) {
   }
   room.reveal.penalty = penalty
 
+  stats.roundDone()
+  // 对上的一局只算一次（同一个 reveal 可能被多次 broadcast）
+  if (room.reveal.allSame && !room.counted) {
+    room.counted = true
+    stats.gameDone()
+  }
+
   room.rounds.push({
     round: room.round,
     allSame: room.reveal.allSame,
@@ -295,6 +434,7 @@ function handleMessage(ws, msg) {
       r.hostId = p.id
       ws.roomCode = r.code
       ws.playerId = p.id
+      stats.playerSeated(name, { created: true })
       send(ws, { type: 'joined', playerId: p.id, room: roomFor(r, p) })
       broadcast(r)
       return
@@ -313,6 +453,7 @@ function handleMessage(ws, msg) {
       const p = addPlayer(r, name, ws)
       ws.roomCode = r.code
       ws.playerId = p.id
+      stats.playerSeated(name, { joined: true })
       send(ws, { type: 'joined', playerId: p.id, room: roomFor(r, p) })
       broadcast(r)
       return
@@ -359,6 +500,7 @@ function handleMessage(ws, msg) {
       room.round = 0
       room.rounds = []
       room.distance = 0
+      room.counted = false
       beginRound(room)
       broadcast(room)
       return
@@ -399,6 +541,7 @@ function handleMessage(ws, msg) {
       room.rounds = []
       room.distance = 0
       room.deadline = 0
+      room.counted = false
       broadcast(room)
       return
     }
@@ -445,6 +588,7 @@ function handleMessage(ws, msg) {
       if (!text) return
       player.lastChatAt = now
       touch(room)
+      stats.chatSent()
       const payload = JSON.stringify({
         type: 'chat',
         id: crypto.randomUUID(),
@@ -533,5 +677,15 @@ setInterval(() => {
 
 server.listen(PORT, () => {
   console.log(`\n  RESONANCE · ${PROD ? '生产' : '开发'}模式`)
-  console.log(`  http://localhost:${PORT}\n`)
+  console.log(`  http://localhost:${PORT}`)
+  if (!STATS_TOKEN) console.log(`  访问统计（仅本机）：http://localhost:${PORT}/admin`)
+  console.log('')
 })
+
+// 退出前把没落盘的统计写下去
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    stats.save()
+    process.exit(0)
+  })
+}

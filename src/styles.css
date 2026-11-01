@@ -1097,9 +1097,9 @@ body {
 
 .savesheet__row {
   display: flex;
-  gap: 10px;
 }
 
+/* 只剩一个「下载」：整行一个按钮，别缩成半截 */
 .savesheet__row > * {
   flex: 1;
 }

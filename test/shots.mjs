@@ -301,17 +301,25 @@ async function main() {
       assert(save.open, '手机点「存成图片」弹出长按保存浮层')
       assert(save.w > 600 && save.h > 300, `浮层里的图是完整尺寸（${save.w}×${save.h}）`)
       await shot(`${prefix}-8b-save`)
-      const btnH = await evalJs(
-        `[...document.querySelectorAll('.savesheet__row .btn')].map((b) => Math.round(b.getBoundingClientRect().height)).join('/')`,
+      const sheetBtns = await evalJs(
+        `(() => {
+          const bs = [...document.querySelectorAll('.savesheet .btn')]
+          return {
+            labels: bs.map((b) => b.textContent.trim()).join('/'),
+            h: bs.map((b) => Math.round(b.getBoundingClientRect().height)),
+            w: bs.map((b) => Math.round(b.getBoundingClientRect().width)),
+            rowW: Math.round(document.querySelector('.savesheet__row').getBoundingClientRect().width),
+          }
+        })()`,
       )
-      record('浮层按钮高度', btnH)
-      assert(
-        btnH.split('/').every((h) => Number(h) >= 40),
-        `「下载 / 好了」两个按钮一样高（${btnH}）`,
-      )
-      await clickText('好了')
+      record('浮层按钮', `${sheetBtns.labels} · 高 ${sheetBtns.h.join('/')} 宽 ${sheetBtns.w.join('/')} / 行 ${sheetBtns.rowW}`)
+      assert(sheetBtns.labels === '下载', `浮层里只有一个「下载」按钮（实得 ${sheetBtns.labels}）`)
+      assert(sheetBtns.h[0] >= 40, `「下载」按钮高度正常（${sheetBtns.h[0]}px）`)
+      assert(Math.abs(sheetBtns.w[0] - sheetBtns.rowW) <= 2, '「下载」占满整行宽度')
+      // 没有「好了」了，点遮罩就收起
+      await evalJs(`document.querySelector('.savesheet').click()`)
       await sleep(300)
-      assert(!(await evalJs(`!!document.querySelector('.savesheet')`)), '点「好了」浮层关掉')
+      assert(!(await evalJs(`!!document.querySelector('.savesheet')`)), '点遮罩浮层收起')
     } else {
       assert(!save.open, '桌面走直接下载，不弹长按浮层')
     }

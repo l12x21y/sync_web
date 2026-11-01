@@ -337,6 +337,7 @@ export function isMobileDevice() {
 /**
  * 手机上的存图路径：把图渲染成 <img> 放进全屏浮层，让用户长按/右键保存。
  * iOS 和微信里 a[download] 会被静默忽略，长按存图是唯一稳的路子。
+ * 浮层里只放一个「下载」，关掉就是点一下遮罩（或按 ESC）。
  */
 export function openSaveSheet(canvas, filename) {
   const url = canvas.toDataURL('image/png')
@@ -351,7 +352,7 @@ export function openSaveSheet(canvas, filename) {
 
   const tip = document.createElement('p')
   tip.className = 'savesheet__tip'
-  tip.textContent = '长按图片 → 存到相册'
+  tip.textContent = '长按图片，存到相册'
 
   const img = document.createElement('img')
   img.className = 'savesheet__img'
@@ -362,15 +363,10 @@ export function openSaveSheet(canvas, filename) {
   row.className = 'savesheet__row'
 
   const dl = document.createElement('a')
-  dl.className = 'btn btn--ghost btn--sm'
+  dl.className = 'btn btn--sm savesheet__download'
   dl.href = url
   dl.download = filename
   dl.textContent = '下载'
-
-  const close = document.createElement('button')
-  close.className = 'btn btn--sm'
-  close.type = 'button'
-  close.textContent = '好了'
 
   const dismiss = () => {
     mask.remove()
@@ -379,13 +375,10 @@ export function openSaveSheet(canvas, filename) {
   const onKey = (e) => {
     if (e.key === 'Escape') dismiss()
   }
-  close.addEventListener('click', dismiss)
-  mask.addEventListener('click', (e) => {
-    if (e.target === mask) dismiss()
-  })
+  mask.addEventListener('click', dismiss)
   window.addEventListener('keydown', onKey)
 
-  row.append(dl, close)
+  row.append(dl)
   box.append(tip, img, row)
   mask.append(box)
   document.body.appendChild(mask)

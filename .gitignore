@@ -6,3 +6,5 @@ shots/
 .DS_Store
 color.png
 ref.png
+# 访问统计数据是运行产物，不进仓库
+data/

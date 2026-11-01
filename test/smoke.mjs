@@ -6,6 +6,7 @@
 import WebSocket from 'ws'
 
 const URL = process.env.WS_URL || 'ws://localhost:5173/ws'
+const BASE = process.env.BASE_URL || URL.replace(/^ws/, 'http').replace(/\/ws$/, '')
 const log = (...a) => console.log('  ', ...a)
 let failed = 0
 
@@ -224,6 +225,50 @@ async function run() {
   await until(() => host.room.players.length === 15)
   assert(host.room.players.length === 15, '有人离开，房间剩 15 人')
   assert(quitter.left === true, '离开者收到确认')
+
+  // ---------------------------------------------------------------- 访问统计
+  const getJson = async (p) => {
+    const r = await fetch(`${BASE}${p}`)
+    return { status: r.status, body: await r.json().catch(() => null) }
+  }
+  const s0 = await getJson('/api/stats')
+  assert(s0.status === 200 && s0.body?.totals, '/api/stats 能读到汇总（本机放行）')
+  const page = await fetch(`${BASE}/admin`)
+  const html = await page.text()
+  assert(page.status === 200 && /VISITS/.test(html), '/admin 能打开统计页')
+
+  // 先造两次页面打开（其中一次带邀请链接），再读汇总
+  const ua = `smoke-${Date.now()}-${Math.random()}`
+  await fetch(`${BASE}/api/hit`, { headers: { 'user-agent': ua } })
+  await fetch(`${BASE}/api/hit?ref=1`, { headers: { 'user-agent': ua } })
+  await wait(300)
+  const s1 = await getJson('/api/stats')
+  const t = s1.body.totals
+  assert(t.pv >= s0.body.totals.pv + 2, `打两次 /api/hit，PV 加二（${s0.body.totals.pv} → ${t.pv}）`)
+  assert(t.uv >= s0.body.totals.uv + 1, '新 UA 算一个独立访客')
+  assert(t.referral >= 1, '带 ref=1 的记进邀请链接打开数')
+  assert(t.rooms >= 1, '建过的房间记进 rooms')
+  assert(t.players >= 16, `落座人次记账（${t.players}，16 人落座）`)
+  assert(t.rounds >= 2, `轮数记账（${t.rounds}）`)
+  assert(t.games >= 1, `对上的一局记进 games（${t.games}）`)
+  assert(t.chats >= 2, `弹幕条数记账（${t.chats}）`)
+  assert(
+    s1.body.topNames.some((n) => n.name === NAME),
+    '常用昵称里有房主名字',
+  )
+  assert(typeof s1.body.live.online === 'number', '汇总里带在线人数')
+
+  // 同一个 UA 再打两次：PV 加二、UV 不重复计（去重靠 IP+UA 指纹）
+  const uvBefore = t.uv
+  await fetch(`${BASE}/api/hit`, { headers: { 'user-agent': ua } })
+  await fetch(`${BASE}/api/hit`, { headers: { 'user-agent': ua } })
+  await wait(300)
+  const s2 = await getJson('/api/stats')
+  assert(s2.body.totals.pv === t.pv + 2, '再打两次，PV 再加二')
+  assert(
+    s2.body.totals.uv === uvBefore,
+    `同一指纹不重复算 UV（${uvBefore} → ${s2.body.totals.uv}）`,
+  )
 
   all.slice(1).forEach((c) => c.ws.close())
   host.ws.close()
