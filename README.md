@@ -32,6 +32,8 @@ npm run dev          # http://localhost:5173
 
 ![揭晓](docs/reveal.png)
 
+![答题页 · 弹幕](docs/play.png)
+
 ![分享图](docs/share.png)
 
 ### 房主设置（大厅里改，开局后锁定）
@@ -54,9 +56,11 @@ shared/normalize.js    判同口径（前后端共用）
 shared/distance.js     默契里程的账本和参照物（前后端共用）
 src/useRoom.js         WebSocket 连接、状态同步、刷新续座、邀请链接优先
 src/components/Shell.jsx  顶栏 + 两栏外壳（窄屏自动单栏）
-src/components/Bubbles.jsx  弹幕气泡层（飘过即散）＋ ChatBar 底部细输入
+src/components/Bubbles.jsx  弹幕气泡层（每条气泡各占一条轨道，飘过即散）＋ ChatBar 底部细输入
+src/laneMath.js        弹幕轨道分配（挑最早空出来的轨道，定死不再跳轨）
 src/screens/           Home / Lobby / Play / Reveal
 test/smoke.mjs         16 个 ws 客户端跑完整一局，39 条断言（含设置/限时/题目/里程/弹幕）
+test/lanes.mjs         弹幕轨道分配单测（铺轨、排队、不跳轨、轨道复用）
 test/shots.mjs         CDP 驱动无头 Chrome，桌面 1440×900 + 手机 390×844 各走一遍
 render.yaml            Render Blueprint
 ```
@@ -66,6 +70,7 @@ render.yaml            Render Blueprint
 ```bash
 node server.js            # 先起服务
 node test/smoke.mjs       # 逻辑冒烟（16 人在场、越权拦截、判同、离开）
+node test/lanes.mjs       # 弹幕轨道分配单测
 node test/shots.mjs       # 出截图到 shots/
 ```
 

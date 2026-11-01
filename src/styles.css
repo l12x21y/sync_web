@@ -1151,7 +1151,7 @@ body {
   white-space: nowrap;
   font-size: 13px;
   color: var(--ink);
-  animation: dm-fly var(--dm-dur, 9s) linear forwards;
+  animation: dm-fly var(--dm-dur, 9s) linear var(--dm-delay, 0s) forwards;
   will-change: transform;
 }
 

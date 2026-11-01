@@ -126,6 +126,14 @@ async function main() {
     console.log('  📸', name)
   }
 
+  // 截图脚本里的轻量断言：失败只记一条 ✗，不中断整趟截图
+  const failures = []
+  const assert = (cond, msg) => {
+    console.log(cond ? `  ✓ ${msg}` : `  ✗ ${msg}`)
+    if (!cond) failures.push(msg)
+  }
+  const record = (label, value) => console.log(`  · ${label}: ${value}`)
+
   const typeInto = (selector, value) =>
     evalJs(`(()=>{
       const el = document.querySelector(${JSON.stringify(selector)})
@@ -184,9 +192,45 @@ async function main() {
 
     await clickText('开始')
     await waitFor(`document.querySelector('.field--word')`)
-    // 群演冒一句泡，弹幕气泡入镜（8–10s 飘完，等它飘进画面）
-    guests[0].send({ type: 'chat', text: '我先想了个方向，都往水果想' })
-    await sleep(2100)
+    // 群演冒几句泡，弹幕气泡入镜（每条各占一条轨道，飘完才散）
+    // 手机上群演只有 2 人，补一条房主这边的（点一下「发」验证真实输入路径）
+    const chatter = [
+      '我先想了个方向，都往水果想',
+      '好，那我想热带的那种',
+      '别提示太明显啦',
+    ]
+    for (let i = 0; i < chatter.length; i += 1) {
+      if (guests[i]) guests[i].send({ type: 'chat', text: chatter[i] })
+      await sleep(200)
+    }
+    if (guests.length < chatter.length) {
+      await typeInto('.chatbar__input', '别提示太明显啦')
+      await sleep(150)
+      await evalJs(`document.querySelector('.chatbar').requestSubmit()`)
+    }
+    await sleep(2200)
+    // 断言：多条气泡各自占一条轨道（同轨不重叠），且都有位移动画
+    const bubbleInfo = await evalJs(`(() => {
+      const bs = [...document.querySelectorAll('.dm__b')]
+      return bs.map((b) => ({
+        top: b.style.top,
+        txt: b.querySelector('.dm__text')?.textContent || '',
+        anim: getComputedStyle(b).animationName,
+        x: Math.round(b.getBoundingClientRect().left),
+      }))
+    })()`)
+    const vw = await evalJs('window.innerWidth')
+    record('弹幕气泡数量', bubbleInfo.length)
+    record('各气泡所在轨道 top', bubbleInfo.map((b) => b.top).join(' / '))
+    record('气泡动画名', bubbleInfo.every((b) => b.anim === 'dm-fly') ? 'dm-fly ✓' : '异常')
+    record('气泡横向位置', bubbleInfo.map((b) => b.x).join(' / '))
+    const tops = bubbleInfo.map((b) => b.top)
+    assert(bubbleInfo.length >= 2, `至少有 2 条气泡同时在场（实得 ${bubbleInfo.length}）`)
+    assert(new Set(tops).size === tops.length, '每条气泡各占一条轨道，没有叠在一起')
+    assert(
+      bubbleInfo.every((b) => b.x < vw),
+      '气泡都已经进入视口（在飞，而不是卡在门外）',
+    )
     await shot(`${prefix}-3-play`)
 
     // 第一轮：不一致
@@ -298,6 +342,11 @@ async function main() {
     /* 浏览器还没退干净，留着也无妨 */
   }
   console.log('\n  截图在', OUT)
+  if (failures.length) {
+    console.error(`  ${failures.length} 条断言未通过：`)
+    failures.forEach((f) => console.error('   -', f))
+    process.exitCode = 1
+  }
 }
 
 main().catch((e) => {
