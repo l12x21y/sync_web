@@ -1,7 +1,8 @@
 /**
  * 保活脚本自测：起一个 mock 的 Supabase PostgREST，验证
- * 1) 正常时敲一次 select 并成功退出  2) 密钥错 / 表不存在时退出码为 1
- * 3) 没配环境变量时跳过且不报错  4) --render 会去叫醒 Render 的 /healthz
+ * 1) 正常时敲一次 select 并成功退出   2) 密钥错 / 表不存在时退出码为 1
+ * 3) 什么都没配时跳过且不报错         4) 只给 Render 时改叫醒实例，叫不醒则算失败
+ * 5) 直连 + Render 两件事都做
  */
 import http from 'http'
 import path from 'path'
@@ -103,22 +104,39 @@ if (r.code !== 1) fail(`404 时退出码应为 1，实际 ${r.code}\n${r.out}`)
 if (!r.out.includes('404')) fail(`404 时应提示状态码\n${r.out}`)
 ok('404：退出 1，提示建表')
 
-// ---------- 4. 没配环境变量：跳过，不算失败 ----------
+// ---------- 4. 一个都没配：跳过，不算失败 ----------
 reset()
 r = await run({})
-if (r.code !== 0) fail(`缺 env 时应退出 0（跳过），实际 ${r.code}\n${r.out}`)
-if (seen.paths.length !== 0) fail(`缺 env 时不该发请求，实际 ${seen.paths}`)
-if (!r.out.includes('跳过')) fail(`缺 env 时应说明跳过\n${r.out}`)
-ok('缺 env：不发请求，退出 0 并说明跳过')
+if (r.code !== 0) fail(`什么都没配时应退出 0（跳过），实际 ${r.code}\n${r.out}`)
+if (seen.paths.length !== 0) fail(`什么都没配时不该发请求，实际 ${seen.paths}`)
+if (!r.out.includes('跳过')) fail(`应说明跳过\n${r.out}`)
+ok('什么都没配：不发请求，退出 0 并说明跳过')
 
-// ---------- 5. --render 顺带叫醒实例 ----------
+// ---------- 5. 只给 Render（没配密钥）：靠唤醒实例间接保活 ----------
+mode = 'ok'
+reset()
+r = await run({}, ['--render', BASE])
+if (r.code !== 0) fail(`只给 Render 时应退出 0，实际 ${r.code}\n${r.out}`)
+if (seen.paths.some((p) => p.startsWith('/rest/v1'))) fail(`没密钥不该查库：${seen.paths}`)
+if (!seen.paths.includes('/healthz')) fail(`应请求 /healthz：${seen.paths}`)
+if (!r.out.includes('已醒')) fail(`应提示 Render 已醒\n${r.out}`)
+ok('只有 Render：跳过查库，改叫醒实例（退出 0）')
+
+// ---------- 6. 只有 Render 且叫不醒：这次保活落空，应报失败 ----------
+reset()
+r = await run({}, ['--render', 'http://127.0.0.1:1'])
+if (r.code !== 1) fail(`只剩 Render 且叫不醒时退出码应为 1，实际 ${r.code}\n${r.out}`)
+ok('只有 Render 且叫不醒：退出 1')
+
+// ---------- 7. 直连成功 + --render：两件事都做 ----------
 mode = 'ok'
 reset()
 r = await run({ SUPABASE_URL: BASE, SUPABASE_SERVICE_KEY: 'test-key' }, ['--render', BASE])
 if (r.code !== 0) fail(`--render 正常时退出码应为 0，实际 ${r.code}\n${r.out}`)
 if (!seen.paths.includes('/healthz')) fail(`没请求 /healthz：${seen.paths}`)
+if (!seen.paths.some((p) => p.startsWith('/rest/v1/sync_stats'))) fail(`没查库：${seen.paths}`)
 if (!r.out.includes('已醒')) fail(`应提示 Render 已醒\n${r.out}`)
-ok('--render：额外请求 /healthz，不影响退出码')
+ok('直连 + --render：查库与唤醒都做，退出 0')
 
 mock.close()
 console.log('\n保活脚本自测全过')

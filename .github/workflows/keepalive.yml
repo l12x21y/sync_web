@@ -1,18 +1,22 @@
 # Supabase 保活：免费项目「一周低活动」会被自动暂停，每天敲两次数据库就不触发。
 # 官方口径见 https://supabase.com/docs/guides/platform/paused-projects
 #
-# 需要仓库 secrets（Settings → Secrets and variables → Actions）：
+# 密钥是可选的：配了就直接查库；没配就只靠下面 RENDER_URL 把睡着的实例叫起来
+# （实例醒来 15 秒后会自己推一次备份，同样算数据库活动）。
+# 想更稳就在 Settings → Secrets and variables → Actions 里配：
 #   SUPABASE_URL           https://xxxx.supabase.co
 #   SUPABASE_SERVICE_KEY   service_role / sb_secret_...（与 Render 上那份相同）
 #
-# cron 是 UTC：03:17 / 15:17 UTC = 11:17 / 23:17 北京。避开整点，GitHub 调度高峰会排队。
+# cron 是 UTC：每 6 小时一次（00:17 / 06:17 / 12:17 / 18:17 UTC = 北京 08:17 / 14:17 / 20:17 / 02:17）。
+# 一天四次而不是一次，是因为 Supabase 的口径是「每天几次数据库请求」才算活跃；避开整点是因为
+# GitHub 调度高峰会把整点的任务排到几十分钟后。
 # 注意：仓库连续 60 天没有任何提交时，GitHub 会自动停用定时工作流，
 #       Actions 页面点一下 Enable workflow 就恢复（业务提交后会自己好）。
 name: supabase-keepalive
 
 on:
   schedule:
-    - cron: '17 3,15 * * *'
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 concurrency:
