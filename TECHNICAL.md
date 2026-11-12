@@ -80,6 +80,15 @@ RLS 开不开都行——用的是 service_role / `sb_secret_` 密钥，绕过 R
 
 > service_role / `sb_secret_` 密钥权限很大，只能放服务端环境变量，别提交进仓库、别放前端。
 
+**④ 防自动暂停**：Supabase 免费项目在过去一周数据库活动太少时会被自动暂停（官方口径：每天几次数据库请求就够避开）。线上实例虽然每 6 小时推一次备份，但 Render 免费档睡着的实例不会执行定时器，所以另起一条独立的保活：
+
+- 工作流 `.github/workflows/keepalive.yml`，每天两次（03:17 / 15:17 UTC = 北京 11:17 / 23:17）跑 `scripts/keepalive.mjs`
+- 脚本做的事：`GET /rest/v1/sync_stats?select=id&limit=1`——**真的进 Postgres** 的查询（边缘健康检查不算数据库活动）；顺带 `GET /healthz` 把睡着的 Render 实例叫起来
+- 密钥复用同一份，配到仓库 secrets：`SUPABASE_URL`、`SUPABASE_SERVICE_KEY`（Settings → Secrets and variables → Actions）。没配时脚本只打一条 warning 并跳过，不会天天发失败邮件
+- 仓库连续 60 天没有任何提交时 GitHub 会自动停用定时工作流，Actions 页面点一下 Enable workflow 即可恢复
+
+本机手动跑一次：`node scripts/keepalive.mjs --render https://sync-web-trh2.onrender.com`
+
 **本地数据合并上云**（一次性）：`scripts/merge-stats-up.mjs`，把本地 stats.json 增量合并进 Supabase 备份（totals/history 按天求和、seen 取并集取最新时间戳）：
 
 ```powershell
@@ -97,6 +106,7 @@ node test/smoke.mjs       # 逻辑冒烟：16 个 ws 客户端跑完整一局，
 node test/lanes.mjs       # 弹幕轨道分配单测（铺轨、排队、不跳轨、轨道复用）
 node test/shots.mjs       # CDP 驱动无头 Chrome 出截图：桌面 1440×900 + 手机 390×844（含手机长按存图）
 node test/backup.mjs      # 备份推/恢复链路（mock PostgREST）
+node test/keepalive.mjs   # 保活脚本：正常/401/404/缺 env/--render 五种情况
 node test/merge-stats.mjs # 合并语义单测
 node test/shots.mjs       # 截图输出到 shots/，精选进 docs/
 ```

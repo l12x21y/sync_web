@@ -1,0 +1,36 @@
+# Supabase 保活：免费项目「一周低活动」会被自动暂停，每天敲两次数据库就不触发。
+# 官方口径见 https://supabase.com/docs/guides/platform/paused-projects
+#
+# 需要仓库 secrets（Settings → Secrets and variables → Actions）：
+#   SUPABASE_URL           https://xxxx.supabase.co
+#   SUPABASE_SERVICE_KEY   service_role / sb_secret_...（与 Render 上那份相同）
+#
+# cron 是 UTC：03:17 / 15:17 UTC = 11:17 / 23:17 北京。避开整点，GitHub 调度高峰会排队。
+# 注意：仓库连续 60 天没有任何提交时，GitHub 会自动停用定时工作流，
+#       Actions 页面点一下 Enable workflow 就恢复（业务提交后会自己好）。
+name: supabase-keepalive
+
+on:
+  schedule:
+    - cron: '17 3,15 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 敲一次数据库
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          RENDER_URL: https://sync-web-trh2.onrender.com
+        run: node scripts/keepalive.mjs

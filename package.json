@@ -12,7 +12,9 @@
     "build": "vite build",
     "start": "node server.js --prod",
     "smoke": "node test/smoke.mjs",
-    "shots": "node test/shots.mjs"
+    "shots": "node test/shots.mjs",
+    "keepalive": "node scripts/keepalive.mjs",
+    "keepalive:test": "node test/keepalive.mjs"
   },
   "dependencies": {
     "express": "^4.19.2",
